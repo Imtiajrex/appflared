@@ -56258,7 +56258,7 @@ var HYPERDRIVE_PLUGIN = {
       services.push({
         name: `${HYPERDRIVE_PLUGIN_NAME}:${name}`,
         external: {
-          address: `localhost:${proxyPort}`,
+          address: `127.0.0.1:${proxyPort}`,
           tcp: {}
         }
       });
@@ -57815,7 +57815,7 @@ var import_node_http = require("node:http");
 var import_ws4 = __toESM(require("ws"));
 
 // package.json
-var version = "4.20251202.0";
+var version = "4.20251202.1";
 
 // src/plugins/core/inspector-proxy/inspector-proxy.ts
 var import_node_assert17 = __toESM(require("node:assert"));
@@ -58187,7 +58187,7 @@ var HyperdriveProxyController = class {
       );
     });
     const port = await new Promise((resolve5, reject) => {
-      server.listen(0, "localhost", () => {
+      server.listen(0, "127.0.0.1", () => {
         const address = server.address();
         if (address && typeof address !== "string") {
           resolve5(address.port);

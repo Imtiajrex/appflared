@@ -213,23 +213,75 @@
           "description": "Include source maps when uploading this worker.\n\nFor reference, see https://developers.cloudflare.com/workers/wrangler/configuration/#source-maps"
         },
         "placement": {
-          "type": "object",
-          "properties": {
-            "mode": {
-              "type": "string",
-              "enum": [
-                "off",
-                "smart"
-              ]
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "smart"
+                  ]
+                },
+                "hint": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "mode"
+              ],
+              "additionalProperties": false
             },
-            "hint": {
-              "type": "string"
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "const": "targeted"
+                },
+                "region": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "region"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "const": "targeted"
+                },
+                "host": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "host"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "const": "targeted"
+                },
+                "hostname": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "hostname"
+              ],
+              "additionalProperties": false
             }
-          },
-          "required": [
-            "mode"
           ],
-          "additionalProperties": false,
           "description": "Specify how the Worker should be located to minimize round-trip time.\n\nMore details: https://developers.cloudflare.com/workers/platform/smart-placement/"
         },
         "assets": {
@@ -1408,23 +1460,75 @@
           "description": "Include source maps when uploading this worker.\n\nFor reference, see https://developers.cloudflare.com/workers/wrangler/configuration/#source-maps"
         },
         "placement": {
-          "type": "object",
-          "properties": {
-            "mode": {
-              "type": "string",
-              "enum": [
-                "off",
-                "smart"
-              ]
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "off",
+                    "smart"
+                  ]
+                },
+                "hint": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "mode"
+              ],
+              "additionalProperties": false
             },
-            "hint": {
-              "type": "string"
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "const": "targeted"
+                },
+                "region": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "region"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "const": "targeted"
+                },
+                "host": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "host"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "const": "targeted"
+                },
+                "hostname": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "hostname"
+              ],
+              "additionalProperties": false
             }
-          },
-          "required": [
-            "mode"
           ],
-          "additionalProperties": false,
           "description": "Specify how the Worker should be located to minimize round-trip time.\n\nMore details: https://developers.cloudflare.com/workers/platform/smart-placement/"
         },
         "assets": {

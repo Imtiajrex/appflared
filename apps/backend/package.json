@@ -1,0 +1,22 @@
+{
+	"name": "appflare",
+	"version": "0.0.0",
+	"private": true,
+	"scripts": {
+		"deploy": "wrangler deploy",
+		"dev": "wrangler dev",
+		"start": "wrangler dev",
+		"cf-typegen": "wrangler types"
+	},
+	"devDependencies": {
+		"bun-types": "^1.1.17",
+		"tsx": "^4.19.2",
+		"typescript": "^5.5.2",
+		"wrangler": "^4.52.1"
+	},
+	"dependencies": {
+		"convex": "^1.30.0",
+		"dotenv": "^17.2.3",
+		"zod": "^4.1.13"
+	}
+}
