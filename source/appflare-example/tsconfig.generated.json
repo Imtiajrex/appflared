@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": false,
+    "outDir": "./_generated/dist",
+    "rootDir": "./_generated/src",
+    "sourceMap": false,
+    "declarationMap": false,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "include": [
+    "./_generated/src/**/*"
+  ]
+}
