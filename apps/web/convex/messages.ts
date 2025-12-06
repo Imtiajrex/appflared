@@ -1,5 +1,5 @@
-import { query } from './_generated/server';
-import { v } from 'convex/values';
+import { query } from "./_generated/server";
+import { v } from "convex/values";
 
 export const myQueryFunction = query({
 	// Validators for arguments.
@@ -12,7 +12,7 @@ export const myQueryFunction = query({
 	handler: async (ctx, args) => {
 		// Read the database as many times as you need here.
 		// See https://docs.convex.dev/database/reading-data.
-		const documents = await ctx.db.query('messages').collect();
+		const documents = await ctx.db.query("messages").collect();
 
 		// Arguments passed from the client are properties of the args object.
 		console.log(args.first, args.second);

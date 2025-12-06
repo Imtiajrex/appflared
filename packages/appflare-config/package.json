@@ -1,0 +1,22 @@
+{
+	"name": "appflare-config",
+	"version": "0.0.0",
+	"private": true,
+	"exports": {
+		"./_generated/dist/*": {
+			"types": "./_generated/dist/*.d.ts",
+			"default": "./_generated/dist/*.js"
+		},
+		"./*": "./*.ts"
+	},
+	"scripts": {},
+	"devDependencies": {
+		"appflare": "*"
+	},
+	"dependencies": {
+		"@hono/standard-validator": "^0.2.0",
+		"better-fetch": "^1.1.2",
+		"elysia": "^1.4.18",
+		"hono": "^4.10.7"
+	}
+}

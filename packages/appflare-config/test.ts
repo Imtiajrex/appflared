@@ -1,13 +1,27 @@
-import { v } from '../appflare/db';
-import { query } from './_generated/dist/schema-types';
+import { z } from "zod";
+import { mutation, query } from "./_generated/dist/schema-types";
 
 export const getQuery = query({
 	args: {
-		test: v.string(),
+		test: z.string(),
 	},
 	handler: async (ctx, args) => {
-		const result = await ctx.db.query('messages').collect();
-		console.log('Test arg:', args.test);
-		return `Hello, ${args.test}!`;
+		const result = await ctx.db.query("messages").collect();
+		return result;
+	},
+});
+
+export const setMut = mutation({
+	args: {
+		id: z.string(),
+		text: z.string(),
+	},
+	handler: async (ctx, args) => {
+		// Dummy implementation
+		await ctx.db.insert("messages", {
+			body: args.text,
+			user: args.id,
+		});
+		return { success: true };
 	},
 });

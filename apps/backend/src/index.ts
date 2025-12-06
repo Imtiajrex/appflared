@@ -1,5 +1,5 @@
-import { DurableObject } from "cloudflare:workers";
-
+import { DurableObject } from 'cloudflare:workers';
+import app from 'appflare-config/_generated/server/server.js';
 /**
  * Welcome to Cloudflare Workers! This is your first Durable Objects application.
  *
@@ -48,17 +48,6 @@ export default {
 	 * @returns The response to be sent back to the client
 	 */
 	async fetch(request, env, ctx): Promise<Response> {
-		// Create a stub to open a communication channel with the Durable Object
-		// instance named "foo".
-		//
-		// Requests from all Workers to the Durable Object instance named "foo"
-		// will go to a single remote Durable Object instance.
-		const stub = env.MY_DURABLE_OBJECT.getByName("foo");
-
-		// Call the `sayHello()` RPC method on the stub to invoke the method on
-		// the remote Durable Object instance.
-		const greeting = await stub.sayHello("world");
-
-		return new Response(greeting);
+		return app.fetch(request, env, ctx);
 	},
 } satisfies ExportedHandler<Env>;

@@ -1,0 +1,13 @@
+{
+	"name": "appflare",
+	"version": "0.0.0",
+	"private": true,
+	"exports": {
+		"./*": "./*.tsx"
+	},
+	"scripts": {},
+	"devDependencies": {
+		"typescript": "^5.9.3"
+	},
+	"dependencies": {}
+}
