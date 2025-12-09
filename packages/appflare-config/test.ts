@@ -6,6 +6,7 @@ export const getQuery = query({
 		test: z.string(),
 	},
 	handler: async (ctx, args) => {
+		console.log("SECRET VALUE");
 		const result = await ctx.db.query("messages").collect();
 		return result;
 	},
