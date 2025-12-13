@@ -34,8 +34,28 @@ export interface TableDocMap {
 
 export type Doc<TableName extends TableNames> = TableDocMap[TableName];
 
+export type SortDirection = 1 | -1;
+
+export type QueryWhere<TableName extends TableNames> = Partial<
+	TableDocMap[TableName]
+> & Record<string, unknown>;
+
+export type QuerySortKey<TableName extends TableNames> = keyof TableDocMap[TableName] &
+	string;
+
+export type QuerySort<TableName extends TableNames> =
+	| Partial<Record<QuerySortKey<TableName>, SortDirection>>
+	| Array<[QuerySortKey<TableName>, SortDirection]>
+	| Record<string, SortDirection>
+	| Array<[string, SortDirection]>;
+
 export interface DatabaseQuery<TableName extends TableNames> {
-	collect(): Promise<Array<TableDocMap[TableName]>>;
+	where(filter: QueryWhere<TableName>): DatabaseQuery<TableName>;
+	sort(sort: QuerySort<TableName>): DatabaseQuery<TableName>;
+	limit(limit: number): DatabaseQuery<TableName>;
+	offset(offset: number): DatabaseQuery<TableName>;
+	find(): Promise<Array<TableDocMap[TableName]>>;
+	findOne(): Promise<TableDocMap[TableName] | null>;
 }
 
 export interface DatabaseReader {
@@ -76,6 +96,11 @@ export interface DatabaseWriter extends DatabaseReader {
 		table: TableName,
 		value: EditableDoc<TableName>
 	): Promise<Id<TableName>>;
+	update<TableName extends TableNames>(
+		table: TableName,
+		id: Id<TableName>,
+		partial: Partial<EditableDoc<TableName>>
+	): Promise<void>;
 	patch<TableName extends TableNames>(
 		table: TableName,
 		id: Id<TableName>,

@@ -34,8 +34,8 @@ export function groupBy<T, TKey>(
 	const map = new Map<TKey, T[]>();
 	for (const item of items) {
 		const key = keyFn(item);
-		if (list) {
-			list.push(item);
+		if (map.has(key)) {
+			map.get(key)!.push(item);
 		} else {
 			map.set(key, [item]);
 		}
@@ -79,7 +79,10 @@ export async function assertFileExists(
 	if (!ok) throw new Error(message);
 }
 
-export async function assertDirExists(dirAbs: string, message: string): Promise<void> {
+export async function assertDirExists(
+	dirAbs: string,
+	message: string
+): Promise<void> {
 	try {
 		const stat = await fs.stat(dirAbs);
 		if (!stat.isDirectory()) throw new Error(message);

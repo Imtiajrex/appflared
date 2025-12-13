@@ -7,7 +7,15 @@ export const getQuery = query({
 	},
 	handler: async (ctx, args) => {
 		console.log("SECRET VALUE");
-		const result = await ctx.db.query("tickets").collect();
+		const result = await ctx.db
+			.query("tickets")
+			.where({
+				body: args.test,
+			})
+			.sort({
+				body: -1,
+			})
+			.find();
 		return result;
 	},
 });
