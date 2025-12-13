@@ -34,7 +34,7 @@ export interface TableDocMap {
 
 export type Doc<TableName extends TableNames> = TableDocMap[TableName];
 
-export type SortDirection = 1 | -1;
+export type SortDirection = "asc" | "desc";
 
 export type QueryWhere<TableName extends TableNames> = Partial<
 	TableDocMap[TableName]

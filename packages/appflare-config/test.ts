@@ -13,7 +13,7 @@ export const getQuery = query({
 				body: args.test,
 			})
 			.sort({
-				body: -1,
+				body: "asc",
 			})
 			.find();
 		return result;
