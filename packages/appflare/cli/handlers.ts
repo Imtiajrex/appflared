@@ -3,6 +3,7 @@ import path from "node:path";
 import {
 	DiscoveredHandler,
 	HandlerKind,
+	isValidIdentifier,
 	pascalCase,
 	walkTsFiles,
 	groupBy,
@@ -37,6 +38,7 @@ export async function discoverHandlers(params: {
 		let match: RegExpExecArray | null;
 		while ((match = regex.exec(content)) !== null) {
 			handlers.push({
+				fileName: path.basename(fileAbs, ".ts"),
 				name: match[1],
 				kind: match[2] as HandlerKind,
 				sourceFileAbs: fileAbs,
@@ -47,7 +49,7 @@ export async function discoverHandlers(params: {
 	// De-dupe: keep first occurrence
 	const seen = new Set<string>();
 	const unique = handlers.filter((h) => {
-		const key = `${h.kind}:${h.name}`;
+		const key = `${h.kind}:${h.fileName}:${h.name}`;
 		if (seen.has(key)) return false;
 		seen.add(key);
 		return true;
@@ -55,6 +57,7 @@ export async function discoverHandlers(params: {
 
 	unique.sort((a, b) => {
 		if (a.kind !== b.kind) return a.kind.localeCompare(b.kind);
+		if (a.fileName !== b.fileName) return a.fileName.localeCompare(b.fileName);
 		return a.name.localeCompare(b.name);
 	});
 
@@ -197,13 +200,25 @@ export function generateApiClient(params: {
 	const queries = params.handlers.filter((h) => h.kind === "query");
 	const mutations = params.handlers.filter((h) => h.kind === "mutation");
 
+	const queriesByFile = groupBy(queries, (h) => h.fileName);
+	const mutationsByFile = groupBy(mutations, (h) => h.fileName);
+
+	const sortedEntries = <T>(map: Map<string, T[]>): Array<[string, T[]]> =>
+		Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+
+	const renderObjectKey = (key: string): string =>
+		isValidIdentifier(key) ? key : JSON.stringify(key);
+
+	const handlerTypePrefix = (h: DiscoveredHandler): string =>
+		pascalCase(`${h.fileName}-${h.name}`);
+
 	const typeBlocks: string[] = [];
 	for (const h of params.handlers) {
 		const importPath = toImportPathFromGeneratedSrc(
 			params.outDirAbs,
 			h.sourceFileAbs
 		);
-		const pascal = pascalCase(h.name);
+		const pascal = handlerTypePrefix(h);
 		typeBlocks.push(
 			`type ${pascal}Definition = typeof import(${JSON.stringify(importPath)})[${JSON.stringify(h.name)}];\n` +
 				`type ${pascal}Args = HandlerArgs<${pascal}Definition>;\n` +
@@ -211,53 +226,97 @@ export function generateApiClient(params: {
 		);
 	}
 
-	const queriesClientLines = queries
-		.map((h) => {
-			const pascal = pascalCase(h.name);
-			return (
-				`\t${h.name}: async (args: ${pascal}Args, init) => {\n` +
-				`\t\t\tconst url = buildQueryUrl(baseUrl, ${JSON.stringify(`/queries/${h.name}`)}, args);\n` +
-				`\t\t\tconst response = await request(url, {\n` +
-				`\t\t\t\t...(init ?? {}),\n` +
-				`\t\t\t\tmethod: "GET",\n` +
-				`\t\t\t});\n` +
-				`\t\t\treturn parseJson<${pascal}Result>(response);\n` +
-				`\t\t},`
-			);
+	const queriesTypeLines = sortedEntries(queriesByFile)
+		.map(([fileName, list]) => {
+			const fileKey = renderObjectKey(fileName);
+			const inner = list
+				.slice()
+				.sort((a, b) => a.name.localeCompare(b.name))
+				.map((h) => {
+					const pascal = handlerTypePrefix(h);
+					return `\t\t${h.name}: HandlerInvoker<${pascal}Args, ${pascal}Result>;`;
+				})
+				.join("\n");
+			return `\t${fileKey}: {\n${inner || "\t\t// (none)"}\n\t};`;
 		})
 		.join("\n");
 
-	const mutationsClientLines = mutations
-		.map((h) => {
-			const pascal = pascalCase(h.name);
-			return (
-				`\t${h.name}: async (args: ${pascal}Args, init) => {\n` +
-				`\t\t\tconst url = buildUrl(baseUrl, ${JSON.stringify(`/mutations/${h.name}`)});\n` +
-				`\t\t\tconst response = await request(url, {\n` +
-				`\t\t\t\t...(init ?? {}),\n` +
-				`\t\t\t\tmethod: "POST",\n` +
-				`\t\t\t\theaders: ensureJsonHeaders(init?.headers),\n` +
-				`\t\t\t\tbody: JSON.stringify(args),\n` +
-				`\t\t\t});\n` +
-				`\t\t\treturn parseJson<${pascal}Result>(response);\n` +
-				`\t\t},`
-			);
+	const mutationsTypeLines = sortedEntries(mutationsByFile)
+		.map(([fileName, list]) => {
+			const fileKey = renderObjectKey(fileName);
+			const inner = list
+				.slice()
+				.sort((a, b) => a.name.localeCompare(b.name))
+				.map((h) => {
+					const pascal = handlerTypePrefix(h);
+					return `\t\t${h.name}: HandlerInvoker<${pascal}Args, ${pascal}Result>;`;
+				})
+				.join("\n");
+			return `\t${fileKey}: {\n${inner || "\t\t// (none)"}\n\t};`;
 		})
 		.join("\n");
 
-	const queriesTypeLines = queries
-		.map((h) => {
-			const pascal = pascalCase(h.name);
-			return `\t${h.name}: HandlerInvoker<${pascal}Args, ${pascal}Result>;`;
+	const queriesClientLines = sortedEntries(queriesByFile)
+		.map(([fileName, list]) => {
+			const fileKey = renderObjectKey(fileName);
+			const inner = list
+				.slice()
+				.sort((a, b) => a.name.localeCompare(b.name))
+				.map((h) => {
+					const pascal = handlerTypePrefix(h);
+					const route = `/queries/${fileName}/${h.name}`;
+					return (
+						`\t\t${h.name}: async (args: ${pascal}Args, init) => {\n` +
+						`\t\t\tconst url = buildQueryUrl(baseUrl, ${JSON.stringify(route)}, args);\n` +
+						`\t\t\tconst response = await request(url, {\n` +
+						`\t\t\t\t...(init ?? {}),\n` +
+						`\t\t\t\tmethod: "GET",\n` +
+						`\t\t\t});\n` +
+						`\t\t\treturn parseJson<${pascal}Result>(response);\n` +
+						`\t\t},`
+					);
+				})
+				.join("\n");
+			return `\t${fileKey}: {\n${inner || "\t\t// (none)"}\n\t},`;
 		})
 		.join("\n");
 
-	const mutationsTypeLines = mutations
-		.map((h) => {
-			const pascal = pascalCase(h.name);
-			return `\t${h.name}: HandlerInvoker<${pascal}Args, ${pascal}Result>;`;
+	const mutationsClientLines = sortedEntries(mutationsByFile)
+		.map(([fileName, list]) => {
+			const fileKey = renderObjectKey(fileName);
+			const inner = list
+				.slice()
+				.sort((a, b) => a.name.localeCompare(b.name))
+				.map((h) => {
+					const pascal = handlerTypePrefix(h);
+					const route = `/mutations/${fileName}/${h.name}`;
+					return (
+						`\t\t${h.name}: async (args: ${pascal}Args, init) => {\n` +
+						`\t\t\tconst url = buildUrl(baseUrl, ${JSON.stringify(route)});\n` +
+						`\t\t\tconst response = await request(url, {\n` +
+						`\t\t\t\t...(init ?? {}),\n` +
+						`\t\t\t\tmethod: "POST",\n` +
+						`\t\t\t\theaders: ensureJsonHeaders(init?.headers),\n` +
+						`\t\t\t\tbody: JSON.stringify(args),\n` +
+						`\t\t\t});\n` +
+						`\t\t\treturn parseJson<${pascal}Result>(response);\n` +
+						`\t\t},`
+					);
+				})
+				.join("\n");
+			return `\t${fileKey}: {\n${inner || "\t\t// (none)"}\n\t},`;
 		})
 		.join("\n");
+
+	const queriesTypeDef =
+		queriesByFile.size === 0 ? "{}" : `{\n${queriesTypeLines}\n}`;
+	const mutationsTypeDef =
+		mutationsByFile.size === 0 ? "{}" : `{\n${mutationsTypeLines}\n}`;
+
+	const queriesInit =
+		queriesByFile.size === 0 ? "{}" : `{\n${queriesClientLines}\n\t}`;
+	const mutationsInit =
+		mutationsByFile.size === 0 ? "{}" : `{\n${mutationsClientLines}\n\t}`;
 
 	return `/* eslint-disable */
 /**
@@ -301,13 +360,9 @@ const defaultFetcher: RequestExecutor = (input, init) => fetch(input, init);
 
 ${typeBlocks.join("\n\n")}
 
-export type QueriesClient = {
-${queriesTypeLines || "\t// (none)"}
-};
+export type QueriesClient = ${queriesTypeDef};
 
-export type MutationsClient = {
-${mutationsTypeLines || "\t// (none)"}
-};
+export type MutationsClient = ${mutationsTypeDef};
 
 export type AppflareApiClient = {
 	queries: QueriesClient;
@@ -322,12 +377,8 @@ export type AppflareApiOptions = {
 export function createAppflareApi(options: AppflareApiOptions = {}): AppflareApiClient {
 	const baseUrl = normalizeBaseUrl(options.baseUrl);
 	const request = options.fetcher ?? defaultFetcher;
-	const queries: QueriesClient = {
-${queriesClientLines || "\t\t// (none)"}
-	};
-	const mutations: MutationsClient = {
-${mutationsClientLines || "\t\t// (none)"}
-	};
+	const queries: QueriesClient = ${queriesInit};
+	const mutations: MutationsClient = ${mutationsInit};
 	return { queries, mutations };
 }
 
@@ -440,10 +491,16 @@ export function generateHonoServer(params: {
 	const queries = params.handlers.filter((h) => h.kind === "query");
 	const mutations = params.handlers.filter((h) => h.kind === "mutation");
 
+	const localNameFor = (h: DiscoveredHandler): string =>
+		`__appflare_${pascalCase(h.fileName)}_${h.name}`;
+
 	const grouped = groupBy(params.handlers, (h) => h.sourceFileAbs);
 	const importLines: string[] = [];
 	for (const [fileAbs, list] of Array.from(grouped.entries())) {
-		const specifiers = list.map((h) => h.name).sort();
+		const specifiers = list
+			.slice()
+			.sort((a, b) => a.name.localeCompare(b.name))
+			.map((h) => `${h.name} as ${localNameFor(h)}`);
 		const importPath = toImportPathFromGeneratedServer(
 			params.outDirAbs,
 			fileAbs
@@ -455,26 +512,30 @@ export function generateHonoServer(params: {
 
 	const routeLines: string[] = [];
 	for (const q of queries) {
+		const local = localNameFor(q);
 		routeLines.push(
 			`app.get(\n` +
-				`\t${JSON.stringify(`/queries/${q.name}`)},\n` +
-				`\tsValidator("query", z.object(${q.name}.args as any)),\n` +
+				`\t${JSON.stringify(`/queries/${q.fileName}/${q.name}`)},\n` +
+				`\tsValidator("query", z.object(${local}.args as any)),\n` +
 				`\tasync (c) => {\n` +
 				`\t\tconst query = c.req.valid("query");\n` +
-				`\t\tconst result = await ${q.name}.handler(appflareContext, query as any);\n` +
+				`\t\tconst ctx = await createContext(c);\n` +
+				`\t\tconst result = await ${local}.handler(ctx as any, query as any);\n` +
 				`\t\treturn c.json(result, 200);\n` +
 				`\t}\n` +
 				`);`
 		);
 	}
 	for (const m of mutations) {
+		const local = localNameFor(m);
 		routeLines.push(
 			`app.post(\n` +
-				`\t${JSON.stringify(`/mutations/${m.name}`)},\n` +
-				`\tsValidator("json", z.object(${m.name}.args as any)),\n` +
+				`\t${JSON.stringify(`/mutations/${m.fileName}/${m.name}`)},\n` +
+				`\tsValidator("json", z.object(${local}.args as any)),\n` +
 				`\tasync (c) => {\n` +
 				`\t\tconst body = c.req.valid("json");\n` +
-				`\t\tconst result = await ${m.name}.handler(appflareContext, body as any);\n` +
+				`\t\tconst ctx = await createContext(c);\n` +
+				`\t\tconst result = await ${local}.handler(ctx as any, body as any);\n` +
 				`\t\treturn c.json(result, 200);\n` +
 				`\t}\n` +
 				`);`
@@ -488,46 +549,39 @@ export function generateHonoServer(params: {
  */
 
 import { Hono } from "hono";
+import type { Context as HonoContext } from "hono";
 import { sValidator } from "@hono/standard-validator";
 import { z } from "zod";
 import { cors } from "hono/cors";
 
+import type { MutationContext, QueryContext } from "../src/schema-types";
+
 ${importLines.join("\n")}
 
-const appflareContext = {
-	db: {
-		query: (tableName: string) => {
-			const cursor = {
-				where: (_filter: any) => cursor,
-				sort: (_sort: any) => cursor,
-				select: (_keys: any) => cursor,
-				populate: (_keys: any) => cursor,
-				limit: (_limit: number) => cursor,
-				offset: (_offset: number) => cursor,
-				find: async () => {
-					return [{ id: "1", table: tableName, text: "Hello World" }];
-				},
-				findOne: async () => {
-					return { id: "1", table: tableName, text: "Hello World" };
-				},
-			};
-			return cursor;
-		},
-		insert: async (_table: string, _value: any) => "1",
-		update: async (_table: string, _id: any, _partial: any) => {},
-		patch: async (_table: string, _id: any, _partial: any) => {},
-		delete: async (_table: string, _id: any) => {},
-	},
-} as any;
+export type AppflareServerContext = QueryContext & MutationContext;
 
-const app = new Hono();
-app.use(
-	cors({
-		origin: "*",
-	})
-);
+export type AppflareHonoServerOptions = {
+	createContext: (c: HonoContext) => AppflareServerContext | Promise<AppflareServerContext>;
+	corsOrigin?: string | string[];
+};
 
-${routeLines.join("\n\n")}
+export function createAppflareHonoServer(options: AppflareHonoServerOptions): Hono {
+	const createContext = options.createContext;
+	const app = new Hono();
+	app.use(
+		cors({
+			origin: options.corsOrigin ?? "*",
+		})
+	);
+
+	${routeLines.join("\n\n\t")}
+
+	return app;
+}
+
+const app = createAppflareHonoServer({
+	createContext: () => ({} as any),
+});
 
 export default app;
 `;

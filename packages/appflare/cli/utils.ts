@@ -10,6 +10,7 @@ export type AppflareConfig = {
 export type HandlerKind = "query" | "mutation";
 
 export type DiscoveredHandler = {
+	fileName: string;
 	name: string;
 	kind: HandlerKind;
 	sourceFileAbs: string;

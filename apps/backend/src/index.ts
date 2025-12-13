@@ -1,5 +1,5 @@
 import { MONGO_DURABLE_OBJECT } from 'cloudflare-do-mongo/do';
-import app from './hono';
+import app from 'appflare-config/_generated/server/server';
 import { WebSocketHibernationServer } from './websocket-hibernation-server';
 
 export default {
