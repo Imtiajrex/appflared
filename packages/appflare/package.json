@@ -2,12 +2,18 @@
 	"name": "appflare",
 	"version": "0.0.0",
 	"private": true,
+	"bin": {
+		"appflare": "./cli.ts"
+	},
 	"exports": {
-		"./*": "./*.tsx"
+		"./*": "./*.ts"
 	},
 	"scripts": {},
 	"devDependencies": {
 		"typescript": "^5.9.3"
 	},
-	"dependencies": {}
+	"dependencies": {
+		"commander": "^14.0.1",
+		"zod": "^4.1.13"
+	}
 }

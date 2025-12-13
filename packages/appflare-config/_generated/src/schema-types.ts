@@ -9,12 +9,12 @@ type SchemaValidator<TValue> = {
 
 export type AnyValidator = SchemaValidator<unknown>;
 
-export type TableNames = "messages" | "users" | "demo";
+export type TableNames = "tickets" | "users";
 
 export type Id<TableName extends string> = string & { __table?: TableName };
 
-export interface MessagesDoc {
-	_id: Id<"messages">;
+export interface TicketsDoc {
+	_id: Id<"tickets">;
 	_creationTime: number;
 	body: string;
 	user: Id<"users">;
@@ -24,20 +24,12 @@ export interface UsersDoc {
 	_id: Id<"users">;
 	_creationTime: number;
 	name: string;
-	tokenIdentifier: string;
-}
-
-export interface DemoDoc {
-	_id: Id<"demo">;
-	_creationTime: number;
-	title: string;
-	description?: string;
+	tickets: Array<Id<"tickets">>;
 }
 
 export interface TableDocMap {
-	messages: MessagesDoc;
+	tickets: TicketsDoc;
 	users: UsersDoc;
-	demo: DemoDoc;
 }
 
 export type Doc<TableName extends TableNames> = TableDocMap[TableName];
@@ -112,7 +104,6 @@ export const mutation = <TArgs extends QueryArgsShape, TResult>(
 ): MutationDefinition<TArgs, TResult> => definition;
 
 export const tableIndexes = {
-	messages: [],
+	tickets: [],
 	users: [],
-	demo: [],
 } as const;

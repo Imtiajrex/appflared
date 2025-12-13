@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { mutation, query } from "./_generated/dist/schema-types";
+import { mutation, query } from "./_generated/src/schema-types";
 
 export const getQuery = query({
 	args: {
@@ -7,7 +7,7 @@ export const getQuery = query({
 	},
 	handler: async (ctx, args) => {
 		console.log("SECRET VALUE");
-		const result = await ctx.db.query("messages").collect();
+		const result = await ctx.db.query("tickets").collect();
 		return result;
 	},
 });
@@ -18,8 +18,7 @@ export const setMut = mutation({
 		text: z.string(),
 	},
 	handler: async (ctx, args) => {
-		// Dummy implementation
-		await ctx.db.insert("messages", {
+		await ctx.db.insert("tickets", {
 			body: args.text,
 			user: args.id,
 		});

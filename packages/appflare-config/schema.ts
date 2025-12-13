@@ -1,16 +1,13 @@
-import { defineSchema, defineTable, v } from "../appflare/db";
+import { defineSchema, defineTable } from "appflare/db";
+import { v } from "appflare/values";
 
 export default defineSchema({
-	messages: defineTable({
+	tickets: defineTable({
 		body: v.string(),
 		user: v.id("users"),
 	}),
 	users: defineTable({
 		name: v.string(),
-		tokenIdentifier: v.string(),
-	}),
-	demo: defineTable({
-		title: v.string(),
-		description: v.string().optional(),
+		tickets: v.array(v.id("tickets")),
 	}),
 });
