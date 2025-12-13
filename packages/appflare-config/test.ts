@@ -12,9 +12,12 @@ export const getQuery = query({
 			.where({
 				body: args.test,
 			})
+			.populate("user")
+			.populate("roombas")
 			.sort({
 				body: "asc",
 			})
+			.select(["body", "roombas"])
 			.find();
 		return result;
 	},
@@ -29,6 +32,7 @@ export const setMut = mutation({
 		await ctx.db.insert("tickets", {
 			body: args.text,
 			user: args.id,
+			roombas: ["roomba1", "roomba2"],
 		});
 		return { success: true };
 	},

@@ -20,8 +20,6 @@ type AppflareConfig = {
 	outDir: string;
 };
 
-type HandlerKind = "query" | "mutation";
-
 const program = new Command();
 
 program.name("appflare").description("Appflare CLI").version("0.0.0");

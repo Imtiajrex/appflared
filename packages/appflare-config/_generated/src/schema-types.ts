@@ -9,15 +9,23 @@ type SchemaValidator<TValue> = {
 
 export type AnyValidator = SchemaValidator<unknown>;
 
-export type TableNames = "tickets" | "users";
+export type TableNames = "roombas" | "tickets" | "users";
 
-export type Id<TableName extends string> = string & { __table?: TableName };
+export type Id<TableName extends TableNames> = string & { __table?: TableName };
+
+export interface RoombasDoc {
+	_id: Id<"roombas">;
+	_creationTime: number;
+	model: string;
+	owner: Id<"users">;
+}
 
 export interface TicketsDoc {
 	_id: Id<"tickets">;
 	_creationTime: number;
 	body: string;
 	user: Id<"users">;
+	roombas: Array<Id<"roombas">>;
 }
 
 export interface UsersDoc {
@@ -28,11 +36,50 @@ export interface UsersDoc {
 }
 
 export interface TableDocMap {
+	roombas: RoombasDoc;
 	tickets: TicketsDoc;
 	users: UsersDoc;
 }
 
 export type Doc<TableName extends TableNames> = TableDocMap[TableName];
+
+type Keys<T> = keyof T;
+
+type NonNil<T> = Exclude<T, null | undefined>;
+
+type ExtractIdTableName<T> = NonNil<T> extends Id<infer TTable>
+	? TTable
+	: NonNil<T> extends Array<infer TItem>
+		? ExtractIdTableName<TItem>
+		: never;
+
+type PopulateValue<T> = T extends Id<infer TTable>
+	? (TTable extends TableNames ? Doc<TTable> : never)
+	: T extends Array<infer TItem>
+		? Array<PopulateValue<TItem>>
+		: T extends null
+			? null
+			: T extends undefined
+				? undefined
+				: NonNil<T> extends Id<infer TTable2>
+					? (TTable2 extends TableNames ? Doc<TTable2> : never) | Extract<T, null> | Extract<T, undefined>
+					: NonNil<T> extends Array<infer TItem2>
+						? (Array<PopulateValue<TItem2>> | Extract<T, null> | Extract<T, undefined>)
+						: T;
+
+type PopulatableKeys<TDoc> = {
+	[K in Keys<TDoc>]: ExtractIdTableName<TDoc[K]> extends string ? K : never;
+}[Keys<TDoc>];
+
+type WithPopulated<TDoc, TKey extends Keys<TDoc>> = {
+	[K in Keys<TDoc>]: K extends TKey ? PopulateValue<TDoc[K]> : TDoc[K];
+};
+
+type WithPopulatedMany<TDoc, TKeys extends Keys<TDoc>> = {
+	[K in Keys<TDoc>]: K extends TKeys ? PopulateValue<TDoc[K]> : TDoc[K];
+};
+
+type WithSelected<TDoc, TKeys extends Keys<TDoc>> = Pick<TDoc, TKeys>;
 
 export type SortDirection = "asc" | "desc";
 
@@ -49,19 +96,37 @@ export type QuerySort<TableName extends TableNames> =
 	| Record<string, SortDirection>
 	| Array<[string, SortDirection]>;
 
-export interface DatabaseQuery<TableName extends TableNames> {
-	where(filter: QueryWhere<TableName>): DatabaseQuery<TableName>;
-	sort(sort: QuerySort<TableName>): DatabaseQuery<TableName>;
-	limit(limit: number): DatabaseQuery<TableName>;
-	offset(offset: number): DatabaseQuery<TableName>;
-	find(): Promise<Array<TableDocMap[TableName]>>;
-	findOne(): Promise<TableDocMap[TableName] | null>;
+export interface DatabaseQuery<
+	TableName extends TableNames,
+	TResultDoc = TableDocMap[TableName],
+> {
+	where(filter: QueryWhere<TableName>): DatabaseQuery<TableName, TResultDoc>;
+	sort(sort: QuerySort<TableName>): DatabaseQuery<TableName, TResultDoc>;
+	limit(limit: number): DatabaseQuery<TableName, TResultDoc>;
+	offset(offset: number): DatabaseQuery<TableName, TResultDoc>;
+
+	select<const TKeys extends readonly Keys<TResultDoc>[]>(
+		keys: TKeys
+	): DatabaseQuery<TableName, WithSelected<TResultDoc, TKeys[number]>>;
+	select<const TKeys extends readonly Keys<TResultDoc>[]>(
+		...keys: TKeys
+	): DatabaseQuery<TableName, WithSelected<TResultDoc, TKeys[number]>>;
+
+	populate<const TKey extends PopulatableKeys<TResultDoc>>(
+		key: TKey
+	): DatabaseQuery<TableName, WithPopulated<TResultDoc, TKey>>;
+	populate<const TKeys extends readonly PopulatableKeys<TResultDoc>[]>(
+		keys: TKeys
+	): DatabaseQuery<TableName, WithPopulatedMany<TResultDoc, TKeys[number]>>;
+
+	find(): Promise<Array<TResultDoc>>;
+	findOne(): Promise<TResultDoc | null>;
 }
 
 export interface DatabaseReader {
 	query<TableName extends TableNames>(
 		table: TableName
-	): DatabaseQuery<TableName>;
+	): DatabaseQuery<TableName, TableDocMap[TableName]>;
 }
 
 export interface QueryContext {
@@ -129,6 +194,7 @@ export const mutation = <TArgs extends QueryArgsShape, TResult>(
 ): MutationDefinition<TArgs, TResult> => definition;
 
 export const tableIndexes = {
+	roombas: [],
 	tickets: [],
 	users: [],
 } as const;
