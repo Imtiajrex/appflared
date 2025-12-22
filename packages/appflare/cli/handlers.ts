@@ -487,9 +487,14 @@ async function parseJson<TResult>(response: Response): Promise<TResult> {
 export function generateHonoServer(params: {
 	handlers: DiscoveredHandler[];
 	outDirAbs: string;
+	schemaPathAbs: string;
 }): string {
 	const queries = params.handlers.filter((h) => h.kind === "query");
 	const mutations = params.handlers.filter((h) => h.kind === "mutation");
+	const schemaImportPath = toImportPathFromGeneratedServer(
+		params.outDirAbs,
+		params.schemaPathAbs
+	);
 
 	const localNameFor = (h: DiscoveredHandler): string =>
 		`__appflare_${pascalCase(h.fileName)}_${h.name}`;
@@ -553,20 +558,61 @@ import type { Context as HonoContext } from "hono";
 import { sValidator } from "@hono/standard-validator";
 import { z } from "zod";
 import { cors } from "hono/cors";
+import schema from ${JSON.stringify(schemaImportPath)};
+import {
+	createMongoDbContext,
+	type MongoDbContext,
+} from "appflare/server/db";
 
-import type { MutationContext, QueryContext } from "../src/schema-types";
+import type { TableDocMap, TableNames } from "../src/schema-types";
 
 ${importLines.join("\n")}
 
-export type AppflareServerContext = QueryContext & MutationContext;
+export type AppflareDbContext = MongoDbContext<TableNames, TableDocMap>;
+
+export type AppflareServerContext = { db: AppflareDbContext };
 
 export type AppflareHonoServerOptions = {
-	createContext: (c: HonoContext) => AppflareServerContext | Promise<AppflareServerContext>;
+	/** Provide a static Mongo Db instance. If omitted, set getDb instead. */
+	db?: import("mongodb").Db;
+	/** Provide a per-request Mongo Db instance (e.g. from Cloudflare env bindings). */
+	getDb?: (c: HonoContext) => import("mongodb").Db | Promise<import("mongodb").Db>;
+	/** Optionally extend the context beyond the db wrapper. */
+	createContext?: (
+		c: HonoContext,
+		db: AppflareDbContext
+	) => AppflareServerContext | Promise<AppflareServerContext>;
+	collectionName?: (table: TableNames) => string;
 	corsOrigin?: string | string[];
 };
 
 export function createAppflareHonoServer(options: AppflareHonoServerOptions): Hono {
-	const createContext = options.createContext;
+	const fixedDb =
+		options.db &&
+		createMongoDbContext<TableNames, TableDocMap>({
+			db: options.db,
+			schema,
+			collectionName: options.collectionName,
+		});
+
+	if (!fixedDb && !options.getDb) {
+		throw new Error(
+			"AppflareHonoServer requires either options.db or options.getDb to initialize the database context."
+		);
+	}
+
+	const resolveDb = async (c: HonoContext): Promise<AppflareDbContext> => {
+		if (fixedDb) return fixedDb;
+		const db = await options.getDb!(c);
+		return createMongoDbContext<TableNames, TableDocMap>({
+			db,
+			schema,
+			collectionName: options.collectionName,
+		});
+	};
+
+	const createContext =
+		options.createContext ?? ((_c, db) => ({ db } as AppflareServerContext));
 	const app = new Hono();
 	app.use(
 		cors({
@@ -574,13 +620,24 @@ export function createAppflareHonoServer(options: AppflareHonoServerOptions): Ho
 		})
 	);
 
-	${routeLines.join("\n\n\t")}
+	${routeLines
+		.map((line) =>
+			line.replace(
+				"const ctx = await createContext(c);",
+				"const db = await resolveDb(c);\n\t\tconst ctx = await createContext(c, db);"
+			)
+		)
+		.join("\n\n\t")}
 
 	return app;
 }
 
 const app = createAppflareHonoServer({
-	createContext: () => ({} as any),
+	getDb: () => {
+		throw new Error(
+			"AppflareHonoServer default export requires options.db or options.getDb. Provide one when creating the server."
+		);
+	},
 });
 
 export default app;

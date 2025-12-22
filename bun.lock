@@ -13,6 +13,7 @@
       "name": "backend",
       "version": "0.0.0",
       "dependencies": {
+        "appflare": "*",
         "cloudflare-do-mongo": "^0.1.2",
         "convex": "^1.30.0",
         "dotenv": "^17.2.3",
@@ -54,6 +55,7 @@
       },
       "dependencies": {
         "commander": "^14.0.1",
+        "mongodb": "^7.0.0",
         "zod": "^4.1.13",
       },
       "devDependencies": {

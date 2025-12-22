@@ -6,7 +6,8 @@
 		"appflare": "./cli.ts"
 	},
 	"exports": {
-		"./*": "./*.ts"
+		"./*": "./*.ts",
+		"./server/db": "./server/db.ts"
 	},
 	"scripts": {},
 	"devDependencies": {
@@ -14,6 +15,7 @@
 	},
 	"dependencies": {
 		"commander": "^14.0.1",
+		"mongodb": "^7.0.0",
 		"zod": "^4.1.13"
 	}
 }

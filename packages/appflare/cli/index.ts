@@ -124,7 +124,11 @@ async function buildFromConfig(params: {
 	const apiTs = generateApiClient({ handlers, outDirAbs });
 	await fs.writeFile(path.join(outDirAbs, "src", "api.ts"), apiTs);
 
-	const serverTs = generateHonoServer({ handlers, outDirAbs });
+	const serverTs = generateHonoServer({
+		handlers,
+		outDirAbs,
+		schemaPathAbs,
+	});
 	await fs.writeFile(path.join(outDirAbs, "server", "server.ts"), serverTs);
 
 	if (emit) {

@@ -15,6 +15,7 @@
 		"wrangler": "^4.52.1"
 	},
 	"dependencies": {
+		"appflare": "*",
 		"cloudflare-do-mongo": "^0.1.2",
 		"convex": "^1.30.0",
 		"dotenv": "^17.2.3",
