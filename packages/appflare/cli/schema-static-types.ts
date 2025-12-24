@@ -1,0 +1,151 @@
+export const staticTypeDefinitions = `
+type Keys<T> = keyof T;
+
+type NonNil<T> = Exclude<T, null | undefined>;
+
+type ExtractIdTableName<T> = NonNil<T> extends Id<infer TTable>
+	? TTable
+	: NonNil<T> extends Array<infer TItem>
+		? ExtractIdTableName<TItem>
+		: never;
+
+type PopulateValue<T> = T extends Id<infer TTable>
+	? (TTable extends TableNames ? Doc<TTable> : never)
+	: T extends Array<infer TItem>
+		? Array<PopulateValue<TItem>>
+		: T extends null
+			? null
+			: T extends undefined
+				? undefined
+				: NonNil<T> extends Id<infer TTable2>
+					? (TTable2 extends TableNames ? Doc<TTable2> : never) | Extract<T, null> | Extract<T, undefined>
+					: NonNil<T> extends Array<infer TItem2>
+						? (Array<PopulateValue<TItem2>> | Extract<T, null> | Extract<T, undefined>)
+						: T;
+
+type PopulatableKeys<TDoc> = {
+	[K in Keys<TDoc>]: ExtractIdTableName<TDoc[K]> extends string ? K : never;
+}[Keys<TDoc>];
+
+type WithPopulated<TDoc, TKey extends Keys<TDoc>> = {
+	[K in Keys<TDoc>]: K extends TKey ? PopulateValue<TDoc[K]> : TDoc[K];
+};
+
+type WithPopulatedMany<TDoc, TKeys extends Keys<TDoc>> = {
+	[K in Keys<TDoc>]: K extends TKeys ? PopulateValue<TDoc[K]> : TDoc[K];
+};
+
+type WithSelected<TDoc, TKeys extends Keys<TDoc>> = Pick<TDoc, TKeys>;
+
+export type SortDirection = "asc" | "desc";
+
+export type QueryWhere<TableName extends TableNames> = Partial<
+	TableDocMap[TableName]
+> & Record<string, unknown>;
+
+export type QuerySortKey<TableName extends TableNames> = keyof TableDocMap[TableName] &
+	string;
+
+export type QuerySort<TableName extends TableNames> =
+	| Partial<Record<QuerySortKey<TableName>, SortDirection>>
+	| Array<[QuerySortKey<TableName>, SortDirection]>
+	| Record<string, SortDirection>
+	| Array<[string, SortDirection]>;
+
+export interface DatabaseQuery<
+	TableName extends TableNames,
+	TResultDoc = TableDocMap[TableName],
+> {
+	where(filter: QueryWhere<TableName>): DatabaseQuery<TableName, TResultDoc>;
+	sort(sort: QuerySort<TableName>): DatabaseQuery<TableName, TResultDoc>;
+	limit(limit: number): DatabaseQuery<TableName, TResultDoc>;
+	offset(offset: number): DatabaseQuery<TableName, TResultDoc>;
+
+	select<const TKeys extends readonly Keys<TResultDoc>[]>(
+		keys: TKeys
+	): DatabaseQuery<TableName, WithSelected<TResultDoc, TKeys[number]>>;
+	select<const TKeys extends readonly Keys<TResultDoc>[]>(
+		...keys: TKeys
+	): DatabaseQuery<TableName, WithSelected<TResultDoc, TKeys[number]>>;
+
+	populate<const TKey extends PopulatableKeys<TResultDoc>>(
+		key: TKey
+	): DatabaseQuery<TableName, WithPopulated<TResultDoc, TKey>>;
+	populate<const TKeys extends readonly PopulatableKeys<TResultDoc>[]>(
+		keys: TKeys
+	): DatabaseQuery<TableName, WithPopulatedMany<TResultDoc, TKeys[number]>>;
+
+	find(): Promise<Array<TResultDoc>>;
+	findOne(): Promise<TResultDoc | null>;
+}
+
+export interface DatabaseReader {
+	query<TableName extends TableNames>(
+		table: TableName
+	): DatabaseQuery<TableName, TableDocMap[TableName]>;
+}
+
+export interface QueryContext {
+	db: DatabaseReader;
+}
+
+export type QueryArgsShape = Record<string, AnyValidator>;
+
+type InferValidator<TValidator> =
+	TValidator extends SchemaValidator<infer TValue> ? TValue : never;
+
+export type InferQueryArgs<TArgs extends QueryArgsShape> = {
+	[Key in keyof TArgs]: InferValidator<TArgs[Key]>;
+};
+
+export interface QueryDefinition<TArgs extends QueryArgsShape, TResult> {
+	args: TArgs;
+	handler: (ctx: QueryContext, args: InferQueryArgs<TArgs>) => Promise<TResult>;
+}
+
+export const query = <TArgs extends QueryArgsShape, TResult>(
+	definition: QueryDefinition<TArgs, TResult>
+): QueryDefinition<TArgs, TResult> => definition;
+
+export type EditableDoc<TableName extends TableNames> = Omit<
+	TableDocMap[TableName],
+	"_id" | "_creationTime"
+>;
+
+export interface DatabaseWriter extends DatabaseReader {
+	insert<TableName extends TableNames>(
+		table: TableName,
+		value: EditableDoc<TableName>
+	): Promise<Id<TableName>>;
+	update<TableName extends TableNames>(
+		table: TableName,
+		where: Id<TableName> | QueryWhere<TableName>,
+		partial: Partial<EditableDoc<TableName>>
+	): Promise<void>;
+	patch<TableName extends TableNames>(
+		table: TableName,
+		where: Id<TableName> | QueryWhere<TableName>,
+		partial: Partial<EditableDoc<TableName>>
+	): Promise<void>;
+	delete<TableName extends TableNames>(
+		table: TableName,
+		where: Id<TableName> | QueryWhere<TableName>
+	): Promise<void>;
+}
+
+export interface MutationContext {
+	db: DatabaseWriter;
+}
+
+export interface MutationDefinition<TArgs extends QueryArgsShape, TResult> {
+	args: TArgs;
+	handler: (
+		ctx: MutationContext,
+		args: InferQueryArgs<TArgs>
+	) => Promise<TResult>;
+}
+
+export const mutation = <TArgs extends QueryArgsShape, TResult>(
+	definition: MutationDefinition<TArgs, TResult>
+): MutationDefinition<TArgs, TResult> => definition;
+`;

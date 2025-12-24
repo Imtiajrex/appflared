@@ -1,7 +1,43 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { pascalCase, isValidIdentifier } from "./utils";
+import { staticTypeDefinitions } from "./schema-static-types";
+import { pascalCase } from "./utils";
+import { getZodObjectShape, renderField } from "./zod-utils";
+
+function generateDocParts(
+	tableNames: string[],
+	schema: any
+): {
+	docInterfaces: string[];
+	docMapEntries: string[];
+	tableIndexEntries: string[];
+} {
+	const docInterfaces: string[] = [];
+	const docMapEntries: string[] = [];
+	const tableIndexEntries: string[] = [];
+
+	for (const tableName of tableNames) {
+		const validator = (schema as any)[tableName];
+		const shape = getZodObjectShape(validator);
+		const interfaceName = pascalCase(`${tableName}Doc`);
+
+		const fields = Object.entries(shape);
+		const lines: string[] = [];
+		lines.push(`export interface ${interfaceName} {`);
+		lines.push(`\t_id: Id<${JSON.stringify(tableName)}>;`);
+		lines.push(`\t_creationTime: number;`);
+		for (const [fieldName, fieldSchema] of fields) {
+			const rendered = renderField(fieldName, fieldSchema);
+			lines.push(`\t${rendered}`);
+		}
+		lines.push(`}`);
+
+		docInterfaces.push(lines.join("\n"));
+		docMapEntries.push(`\t${tableName}: ${interfaceName};`);
+		tableIndexEntries.push(`\t${tableName}: [],`);
+	}
+
+	return { docInterfaces, docMapEntries, tableIndexEntries };
+}
 
 export async function getSchemaTableNames(
 	schemaPathAbs: string
@@ -32,30 +68,10 @@ export async function generateSchemaTypes(params: {
 		throw new Error(`Schema has no tables in ${params.schemaPathAbs}`);
 	}
 
-	const docInterfaces: string[] = [];
-	const docMapEntries: string[] = [];
-	const tableIndexEntries: string[] = [];
-
-	for (const tableName of tableNames) {
-		const validator = (schema as any)[tableName];
-		const shape = getZodObjectShape(validator);
-		const interfaceName = pascalCase(`${tableName}Doc`);
-
-		const fields = Object.entries(shape);
-		const lines: string[] = [];
-		lines.push(`export interface ${interfaceName} {`);
-		lines.push(`\t_id: Id<${JSON.stringify(tableName)}>;`);
-		lines.push(`\t_creationTime: number;`);
-		for (const [fieldName, fieldSchema] of fields) {
-			const rendered = renderField(fieldName, fieldSchema);
-			lines.push(`\t${rendered}`);
-		}
-		lines.push(`}`);
-
-		docInterfaces.push(lines.join("\n"));
-		docMapEntries.push(`\t${tableName}: ${interfaceName};`);
-		tableIndexEntries.push(`\t${tableName}: [],`);
-	}
+	const { docInterfaces, docMapEntries, tableIndexEntries } = generateDocParts(
+		tableNames,
+		schema
+	);
 
 	return `/* eslint-disable */
 /**
@@ -80,270 +96,10 @@ ${docMapEntries.join("\n")}
 
 export type Doc<TableName extends TableNames> = TableDocMap[TableName];
 
-type Keys<T> = keyof T;
-
-type NonNil<T> = Exclude<T, null | undefined>;
-
-type ExtractIdTableName<T> = NonNil<T> extends Id<infer TTable>
-	? TTable
-	: NonNil<T> extends Array<infer TItem>
-		? ExtractIdTableName<TItem>
-		: never;
-
-type PopulateValue<T> = T extends Id<infer TTable>
-	? (TTable extends TableNames ? Doc<TTable> : never)
-	: T extends Array<infer TItem>
-		? Array<PopulateValue<TItem>>
-		: T extends null
-			? null
-			: T extends undefined
-				? undefined
-				: NonNil<T> extends Id<infer TTable2>
-					? (TTable2 extends TableNames ? Doc<TTable2> : never) | Extract<T, null> | Extract<T, undefined>
-					: NonNil<T> extends Array<infer TItem2>
-						? (Array<PopulateValue<TItem2>> | Extract<T, null> | Extract<T, undefined>)
-						: T;
-
-type PopulatableKeys<TDoc> = {
-	[K in Keys<TDoc>]: ExtractIdTableName<TDoc[K]> extends string ? K : never;
-}[Keys<TDoc>];
-
-type WithPopulated<TDoc, TKey extends Keys<TDoc>> = {
-	[K in Keys<TDoc>]: K extends TKey ? PopulateValue<TDoc[K]> : TDoc[K];
-};
-
-type WithPopulatedMany<TDoc, TKeys extends Keys<TDoc>> = {
-	[K in Keys<TDoc>]: K extends TKeys ? PopulateValue<TDoc[K]> : TDoc[K];
-};
-
-type WithSelected<TDoc, TKeys extends Keys<TDoc>> = Pick<TDoc, TKeys>;
-
-export type SortDirection = "asc" | "desc";
-
-export type QueryWhere<TableName extends TableNames> = Partial<
-	TableDocMap[TableName]
-> & Record<string, unknown>;
-
-export type QuerySortKey<TableName extends TableNames> = keyof TableDocMap[TableName] &
-	string;
-
-export type QuerySort<TableName extends TableNames> =
-	| Partial<Record<QuerySortKey<TableName>, SortDirection>>
-	| Array<[QuerySortKey<TableName>, SortDirection]>
-	| Record<string, SortDirection>
-	| Array<[string, SortDirection]>;
-
-export interface DatabaseQuery<
-	TableName extends TableNames,
-	TResultDoc = TableDocMap[TableName],
-> {
-	where(filter: QueryWhere<TableName>): DatabaseQuery<TableName, TResultDoc>;
-	sort(sort: QuerySort<TableName>): DatabaseQuery<TableName, TResultDoc>;
-	limit(limit: number): DatabaseQuery<TableName, TResultDoc>;
-	offset(offset: number): DatabaseQuery<TableName, TResultDoc>;
-
-	select<const TKeys extends readonly Keys<TResultDoc>[]>(
-		keys: TKeys
-	): DatabaseQuery<TableName, WithSelected<TResultDoc, TKeys[number]>>;
-	select<const TKeys extends readonly Keys<TResultDoc>[]>(
-		...keys: TKeys
-	): DatabaseQuery<TableName, WithSelected<TResultDoc, TKeys[number]>>;
-
-	populate<const TKey extends PopulatableKeys<TResultDoc>>(
-		key: TKey
-	): DatabaseQuery<TableName, WithPopulated<TResultDoc, TKey>>;
-	populate<const TKeys extends readonly PopulatableKeys<TResultDoc>[]>(
-		keys: TKeys
-	): DatabaseQuery<TableName, WithPopulatedMany<TResultDoc, TKeys[number]>>;
-
-	find(): Promise<Array<TResultDoc>>;
-	findOne(): Promise<TResultDoc | null>;
-}
-
-export interface DatabaseReader {
-	query<TableName extends TableNames>(
-		table: TableName
-	): DatabaseQuery<TableName, TableDocMap[TableName]>;
-}
-
-export interface QueryContext {
-	db: DatabaseReader;
-}
-
-export type QueryArgsShape = Record<string, AnyValidator>;
-
-type InferValidator<TValidator> =
-	TValidator extends SchemaValidator<infer TValue> ? TValue : never;
-
-export type InferQueryArgs<TArgs extends QueryArgsShape> = {
-	[Key in keyof TArgs]: InferValidator<TArgs[Key]>;
-};
-
-export interface QueryDefinition<TArgs extends QueryArgsShape, TResult> {
-	args: TArgs;
-	handler: (ctx: QueryContext, args: InferQueryArgs<TArgs>) => Promise<TResult>;
-}
-
-export const query = <TArgs extends QueryArgsShape, TResult>(
-	definition: QueryDefinition<TArgs, TResult>
-): QueryDefinition<TArgs, TResult> => definition;
-
-export type EditableDoc<TableName extends TableNames> = Omit<
-	TableDocMap[TableName],
-	"_id" | "_creationTime"
->;
-
-export interface DatabaseWriter extends DatabaseReader {
-	insert<TableName extends TableNames>(
-		table: TableName,
-		value: EditableDoc<TableName>
-	): Promise<Id<TableName>>;
-	update<TableName extends TableNames>(
-		table: TableName,
-		where: Id<TableName> | QueryWhere<TableName>,
-		partial: Partial<EditableDoc<TableName>>
-	): Promise<void>;
-	patch<TableName extends TableNames>(
-		table: TableName,
-		where: Id<TableName> | QueryWhere<TableName>,
-		partial: Partial<EditableDoc<TableName>>
-	): Promise<void>;
-	delete<TableName extends TableNames>(
-		table: TableName,
-		where: Id<TableName> | QueryWhere<TableName>
-	): Promise<void>;
-}
-
-export interface MutationContext {
-	db: DatabaseWriter;
-}
-
-export interface MutationDefinition<TArgs extends QueryArgsShape, TResult> {
-	args: TArgs;
-	handler: (
-		ctx: MutationContext,
-		args: InferQueryArgs<TArgs>
-	) => Promise<TResult>;
-}
-
-export const mutation = <TArgs extends QueryArgsShape, TResult>(
-	definition: MutationDefinition<TArgs, TResult>
-): MutationDefinition<TArgs, TResult> => definition;
+${staticTypeDefinitions}
 
 export const tableIndexes = {
 ${tableIndexEntries.join("\n")}
 } as const;
 `;
-}
-
-function getZodObjectShape(schema: any): Record<string, any> {
-	if (!schema || typeof schema !== "object") {
-		throw new Error(`Schema table is not an object`);
-	}
-
-	const def = (schema as any)._def;
-	if (def?.typeName === "ZodObject" || def?.type === "object") {
-		const shape = def.shape;
-		if (typeof shape === "function") {
-			return shape();
-		}
-		if (shape && typeof shape === "object") {
-			return shape;
-		}
-	}
-
-	if (typeof (schema as any).shape === "function") {
-		return (schema as any).shape;
-	}
-	if ((schema as any).shape && typeof (schema as any).shape === "object") {
-		return (schema as any).shape;
-	}
-
-	throw new Error(`Table schema is not a Zod object`);
-}
-
-function renderField(fieldName: string, schema: any): string {
-	const { tsType, optional } = renderType(schema);
-	const safeKey = isValidIdentifier(fieldName)
-		? fieldName
-		: JSON.stringify(fieldName);
-	return `${safeKey}${optional ? "?" : ""}: ${tsType};`;
-}
-
-function renderType(schema: any): { tsType: string; optional: boolean } {
-	const def = schema?._def;
-	const typeName: string | undefined = def?.typeName ?? def?.type;
-
-	if (typeName === "ZodOptional" || typeName === "optional") {
-		const inner = def?.innerType ?? def?.schema ?? schema?._def?.innerType;
-		const rendered = renderType(inner);
-		return { tsType: rendered.tsType, optional: true };
-	}
-	if (typeName === "ZodNullable" || typeName === "nullable") {
-		const inner = def?.innerType ?? def?.schema;
-		const rendered = renderType(inner);
-		return { tsType: `${rendered.tsType} | null`, optional: false };
-	}
-	if (typeName === "ZodDefault" || typeName === "default") {
-		const inner = def?.innerType ?? def?.schema;
-		return renderType(inner);
-	}
-
-	if (typeName === "ZodString" || typeName === "string") {
-		const description: string | undefined =
-			schema?.description ?? def?.description;
-		if (typeof description === "string" && description.startsWith("ref:")) {
-			const table = description.slice("ref:".length);
-			return { tsType: `Id<${JSON.stringify(table)}>`, optional: false };
-		}
-		return { tsType: "string", optional: false };
-	}
-	if (typeName === "ZodNumber" || typeName === "number") {
-		return { tsType: "number", optional: false };
-	}
-	if (typeName === "ZodBoolean" || typeName === "boolean") {
-		return { tsType: "boolean", optional: false };
-	}
-	if (typeName === "ZodDate" || typeName === "date") {
-		return { tsType: "Date", optional: false };
-	}
-	if (typeName === "ZodArray" || typeName === "array") {
-		const inner = def?.element ?? def?.innerType ?? def?.type;
-		const rendered = renderType(inner);
-		return { tsType: `Array<${rendered.tsType}>`, optional: false };
-	}
-	if (typeName === "ZodObject" || typeName === "object") {
-		const shape = getZodObjectShape(schema);
-		const entries = Object.entries(shape);
-		if (entries.length === 0) {
-			return { tsType: "Record<string, unknown>", optional: false };
-		}
-		const props = entries
-			.map(([key, value]) => {
-				const { tsType, optional } = renderType(value);
-				const safeKey = isValidIdentifier(key) ? key : JSON.stringify(key);
-				return `\t${safeKey}${optional ? "?" : ""}: ${tsType};`;
-			})
-			.join("\n");
-		return { tsType: `{\n${props}\n}`, optional: false };
-	}
-	if (typeName === "ZodUnion" || typeName === "union") {
-		const options: any[] = def?.options ?? def?.optionsMap ?? [];
-		const parts = Array.isArray(options)
-			? options.map((o) => renderType(o).tsType)
-			: ["unknown"];
-		return { tsType: parts.join(" | ") || "unknown", optional: false };
-	}
-	if (typeName === "ZodLiteral" || typeName === "literal") {
-		const value = def?.value;
-		return { tsType: JSON.stringify(value), optional: false };
-	}
-	if (typeName === "ZodAny" || typeName === "any") {
-		return { tsType: "any", optional: false };
-	}
-	if (typeName === "ZodUnknown" || typeName === "unknown") {
-		return { tsType: "unknown", optional: false };
-	}
-
-	return { tsType: "unknown", optional: false };
 }
