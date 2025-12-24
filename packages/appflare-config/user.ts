@@ -6,8 +6,11 @@ export const getUsers = query({
 		name: z.string(),
 	},
 	handler: async (ctx, args) => {
+		const where: Record<string, string | undefined> = { name: args.name };
+		if (args.id) where._id = args.id;
+
 		return ctx.db.users.findMany({
-			where: args.id ? { _id: args.id } : undefined,
+			where,
 			include: { roombas: true, tickets: true },
 		});
 	},

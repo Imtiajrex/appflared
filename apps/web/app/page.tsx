@@ -16,7 +16,7 @@ export default function Page() {
 			enabled: true,
 		},
 		args: {
-			name: "imtiaj",
+			name: "User 1",
 			id: undefined,
 		},
 	});
