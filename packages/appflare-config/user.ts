@@ -51,6 +51,7 @@ export const updateUser = mutation({
 		name: z.string().optional(),
 	},
 	handler: async (ctx, args) => {
+		console.log("Updating user with args:", args);
 		await ctx.db.users.update({
 			where: { _id: args.id },
 			data: {

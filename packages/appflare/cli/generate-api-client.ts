@@ -14,6 +14,22 @@ export function generateApiClient(params: {
 	const queries = params.handlers.filter((h) => h.kind === "query");
 	const mutations = params.handlers.filter((h) => h.kind === "mutation");
 
+	const handlerImportsGrouped = groupBy(
+		params.handlers,
+		(h) => h.sourceFileAbs
+	);
+
+	const importLines: string[] = [];
+	const importAliasBySource = new Map<string, string>();
+	for (const [fileAbs, list] of Array.from(handlerImportsGrouped.entries())) {
+		const alias = `__appflare_${pascalCase(list[0].fileName)}`;
+		importAliasBySource.set(fileAbs, alias);
+		const importPath = toImportPathFromGeneratedSrc(params.outDirAbs, fileAbs);
+		importLines.push(
+			`import * as ${alias} from ${JSON.stringify(importPath)};`
+		);
+	}
+
 	const queriesByFile = groupBy(queries, (h) => h.fileName);
 	const mutationsByFile = groupBy(mutations, (h) => h.fileName);
 
@@ -28,15 +44,14 @@ export function generateApiClient(params: {
 
 	const typeBlocks: string[] = [];
 	for (const h of params.handlers) {
-		const importPath = toImportPathFromGeneratedSrc(
-			params.outDirAbs,
-			h.sourceFileAbs
-		);
+		const importAlias = importAliasBySource.get(h.sourceFileAbs)!;
+		const handlerAccessor = `${importAlias}[${JSON.stringify(h.name)}]`;
 		const pascal = handlerTypePrefix(h);
 		typeBlocks.push(
-			`type ${pascal}Definition = typeof import(${JSON.stringify(importPath)})[${JSON.stringify(h.name)}];\n` +
+			`type ${pascal}Definition = typeof ${handlerAccessor};\n` +
 				`type ${pascal}Args = HandlerArgs<${pascal}Definition>;\n` +
-				`type ${pascal}Result = HandlerResult<${pascal}Definition>;`
+				`type ${pascal}Result = HandlerResult<${pascal}Definition>;\n` +
+				`type ${pascal}Client = AppflareHandler<${pascal}Args, ${pascal}Result>;`
 		);
 	}
 
@@ -48,7 +63,7 @@ export function generateApiClient(params: {
 				.sort((a, b) => a.name.localeCompare(b.name))
 				.map((h) => {
 					const pascal = handlerTypePrefix(h);
-					return `\t\t${h.name}: HandlerInvoker<${pascal}Args, ${pascal}Result>;`;
+					return `\t\t${h.name}: ${pascal}Client;`;
 				})
 				.join("\n");
 			return `\t${fileKey}: {\n${inner || "\t\t// (none)"}\n\t};`;
@@ -63,7 +78,7 @@ export function generateApiClient(params: {
 				.sort((a, b) => a.name.localeCompare(b.name))
 				.map((h) => {
 					const pascal = handlerTypePrefix(h);
-					return `\t\t${h.name}: HandlerInvoker<${pascal}Args, ${pascal}Result>;`;
+					return `\t\t${h.name}: ${pascal}Client;`;
 				})
 				.join("\n");
 			return `\t${fileKey}: {\n${inner || "\t\t// (none)"}\n\t};`;
@@ -79,15 +94,24 @@ export function generateApiClient(params: {
 				.map((h) => {
 					const pascal = handlerTypePrefix(h);
 					const route = `/queries/${fileName}/${h.name}`;
+					const importAlias = importAliasBySource.get(h.sourceFileAbs)!;
+					const handlerAccessor = `${importAlias}.${h.name}`;
 					return (
-						`\t\t${h.name}: async (args: ${pascal}Args, init) => {\n` +
-						`\t\t\tconst url = buildQueryUrl(baseUrl, ${JSON.stringify(route)}, args);\n` +
-						`\t\t\tconst response = await request(url, {\n` +
-						`\t\t\t\t...(init ?? {}),\n` +
-						`\t\t\t\tmethod: "GET",\n` +
-						`\t\t\t});\n` +
-						`\t\t\treturn parseJson<${pascal}Result>(response);\n` +
-						`\t\t},`
+						`\t\t${h.name}: withHandlerMetadata<${pascal}Args, ${pascal}Result>(\n` +
+						`\t\t\tasync (args: ${pascal}Args, init) => {\n` +
+						`\t\t\t\tconst url = buildQueryUrl(baseUrl, ${JSON.stringify(route)}, args);\n` +
+						`\t\t\t\tconst response = await request(url, {\n` +
+						`\t\t\t\t\t...(init ?? {}),\n` +
+						`\t\t\t\t\tmethod: "GET",\n` +
+						`\t\t\t\t});\n` +
+						`\t\t\t\treturn parseJson<${pascal}Result>(response);\n` +
+						`\t\t\t},\n` +
+						`\t\t\t{\n` +
+						`\t\t\t\tschema: createHandlerSchema(${handlerAccessor}.args),\n` +
+						`\t\t\t\twebsocket: createHandlerWebsocket<${pascal}Args, ${pascal}Result>(realtime, { defaultTable: ${JSON.stringify(fileName)} }),\n` +
+						`\t\t\t\tpath: ${JSON.stringify(route)},\n` +
+						`\t\t\t}\n` +
+						`\t\t),`
 					);
 				})
 				.join("\n");
@@ -104,17 +128,26 @@ export function generateApiClient(params: {
 				.map((h) => {
 					const pascal = handlerTypePrefix(h);
 					const route = `/mutations/${fileName}/${h.name}`;
+					const importAlias = importAliasBySource.get(h.sourceFileAbs)!;
+					const handlerAccessor = `${importAlias}.${h.name}`;
 					return (
-						`\t\t${h.name}: async (args: ${pascal}Args, init) => {\n` +
-						`\t\t\tconst url = buildUrl(baseUrl, ${JSON.stringify(route)});\n` +
-						`\t\t\tconst response = await request(url, {\n` +
-						`\t\t\t\t...(init ?? {}),\n` +
-						`\t\t\t\tmethod: "POST",\n` +
-						`\t\t\t\theaders: ensureJsonHeaders(init?.headers),\n` +
-						`\t\t\t\tbody: JSON.stringify(args),\n` +
-						`\t\t\t});\n` +
-						`\t\t\treturn parseJson<${pascal}Result>(response);\n` +
-						`\t\t},`
+						`\t\t${h.name}: withHandlerMetadata<${pascal}Args, ${pascal}Result>(\n` +
+						`\t\t\tasync (args: ${pascal}Args, init) => {\n` +
+						`\t\t\t\tconst url = buildUrl(baseUrl, ${JSON.stringify(route)});\n` +
+						`\t\t\t\tconst response = await request(url, {\n` +
+						`\t\t\t\t\t...(init ?? {}),\n` +
+						`\t\t\t\t\tmethod: "POST",\n` +
+						`\t\t\t\t\theaders: ensureJsonHeaders(init?.headers),\n` +
+						`\t\t\t\t\tbody: JSON.stringify(args),\n` +
+						`\t\t\t\t});\n` +
+						`\t\t\t\treturn parseJson<${pascal}Result>(response);\n` +
+						`\t\t\t},\n` +
+						`\t\t\t{\n` +
+						`\t\t\t\tschema: createHandlerSchema(${handlerAccessor}.args),\n` +
+						`\t\t\t\twebsocket: createHandlerWebsocket<${pascal}Args, ${pascal}Result>(realtime, { defaultTable: ${JSON.stringify(fileName)} }),\n` +
+						`\t\t\t\tpath: ${JSON.stringify(route)},\n` +
+						`\t\t\t}\n` +
+						`\t\t),`
 					);
 				})
 				.join("\n");
@@ -139,6 +172,7 @@ export function generateApiClient(params: {
  */
 
 import fetch from "better-fetch";
+import { z } from "zod";
 
 import type {
 	AnyValidator,
@@ -147,6 +181,8 @@ import type {
 	QueryArgsShape,
 	QueryDefinition,
 } from "./schema-types";
+
+${importLines.join("\n")}
 
 type AnyArgsShape = Record<string, AnyValidator>;
 
@@ -165,12 +201,75 @@ type HandlerResult<THandler extends AnyHandlerDefinition> = THandler extends {
 
 type HandlerInvoker<TArgs, TResult> = (args: TArgs, init?: RequestInit) => Promise<TResult>;
 
+type WebSocketFactory = (url: string, protocols?: string | string[]) => WebSocket;
+
+export type RealtimeMessage<TResult> = {
+	type?: string;
+	data?: TResult[];
+	table?: string;
+	where?: unknown;
+	[key: string]: unknown;
+};
+
+export type HandlerWebsocketOptions<TResult> = {
+	baseUrl?: string;
+	table?: string;
+	where?: Record<string, unknown>;
+	orderBy?: Record<string, unknown>;
+	take?: number;
+	skip?: number;
+	path?: string;
+	protocols?: string | string[];
+	signal?: AbortSignal;
+	websocketImpl?: WebSocketFactory;
+	onOpen?: (event: any) => void;
+	onClose?: (event: any) => void;
+	onError?: (event: any) => void;
+	onMessage?: (message: RealtimeMessage<TResult>, raw: any) => void;
+	onData?: (data: TResult[], message: RealtimeMessage<TResult>) => void;
+};
+
+type HandlerMetadata<TArgs, TResult> = {
+	schema: z.ZodObject<Record<string, z.ZodTypeAny>>;
+	websocket: HandlerWebsocket<TArgs, TResult>;
+	path: string;
+};
+
+export type HandlerWebsocket<TArgs, TResult> = (
+	args?: TArgs,
+	options?: HandlerWebsocketOptions<TResult>
+) => WebSocket;
+
+export type AppflareHandler<TArgs, TResult> = HandlerInvoker<TArgs, TResult> &
+	HandlerMetadata<TArgs, TResult>;
+
 type RequestExecutor = (
 	input: RequestInfo | URL,
 	init?: RequestInit
 ) => Promise<Response>;
 
 const defaultFetcher: RequestExecutor = (input, init) => fetch(input, init);
+
+const defaultWebSocketFactory: WebSocketFactory = (url, protocols) => {
+	if (typeof WebSocket === "undefined") {
+		throw new Error(
+			"WebSocket is not available in this environment. Provide options.realtime.websocketImpl to create websockets."
+		);
+	}
+	return new WebSocket(url, protocols);
+};
+
+type ResolvedRealtimeConfig = {
+	baseUrl?: string;
+	path: string;
+	websocketImpl?: WebSocketFactory;
+};
+
+type RealtimeConfig = {
+	baseUrl?: string;
+	path?: string;
+	websocketImpl?: WebSocketFactory;
+};
 
 ${typeBlocks.join("\n\n")}
 
@@ -186,14 +285,92 @@ export type AppflareApiClient = {
 export type AppflareApiOptions = {
 	baseUrl?: string;
 	fetcher?: RequestExecutor;
+	realtime?: RealtimeConfig;
 };
 
 export function createAppflareApi(options: AppflareApiOptions = {}): AppflareApiClient {
 	const baseUrl = normalizeBaseUrl(options.baseUrl);
 	const request = options.fetcher ?? defaultFetcher;
+	const realtime = resolveRealtimeConfig(baseUrl, options.realtime);
 	const queries: QueriesClient = ${queriesInit};
 	const mutations: MutationsClient = ${mutationsInit};
 	return { queries, mutations };
+}
+
+function withHandlerMetadata<TArgs, TResult>(
+	invoke: HandlerInvoker<TArgs, TResult>,
+	meta: HandlerMetadata<TArgs, TResult>
+): AppflareHandler<TArgs, TResult> {
+	const fn = invoke as AppflareHandler<TArgs, TResult>;
+	fn.schema = meta.schema;
+	fn.websocket = meta.websocket;
+	fn.path = meta.path;
+	return fn;
+}
+
+function resolveRealtimeConfig(
+	baseUrl: string,
+	realtime?: RealtimeConfig
+): ResolvedRealtimeConfig {
+	return {
+		baseUrl: normalizeWsBaseUrl(realtime?.baseUrl ?? baseUrl),
+		path: realtime?.path ?? "/ws",
+		websocketImpl: realtime?.websocketImpl ?? defaultWebSocketFactory,
+	};
+}
+
+function createHandlerSchema(args: Record<string, AnyValidator>) {
+	return z.object(args as Record<string, z.ZodTypeAny>);
+}
+
+function createHandlerWebsocket<TArgs, TResult>(
+	realtime: ResolvedRealtimeConfig,
+	defaults: { defaultTable: string }
+): HandlerWebsocket<TArgs, TResult> {
+	return (args, options) => {
+		const baseUrl = normalizeWsBaseUrl(options?.baseUrl ?? realtime.baseUrl);
+		if (!baseUrl) {
+			throw new Error(
+				"Missing realtime baseUrl. Provide createAppflareApi({ realtime: { baseUrl } }) or handler websocket options.baseUrl."
+			);
+		}
+		const params = new URLSearchParams();
+		params.set("table", options?.table ?? defaults.defaultTable);
+		const where = options?.where ?? (isPlainObject(args) ? (args as Record<string, unknown>) : undefined);
+		if (where && Object.keys(where).length > 0) {
+			params.set("where", JSON.stringify(where));
+		}
+		if (options?.orderBy) params.set("orderBy", JSON.stringify(options.orderBy));
+		if (options?.take !== undefined) params.set("take", String(options.take));
+		if (options?.skip !== undefined) params.set("skip", String(options.skip));
+
+		const path = options?.path ?? realtime.path;
+		const url = buildRealtimeUrl(baseUrl, path, params);
+		const websocketFactory = options?.websocketImpl ?? realtime.websocketImpl ?? defaultWebSocketFactory;
+		const socket = websocketFactory(url, options?.protocols);
+
+		if (options?.onOpen) socket.addEventListener("open", options.onOpen as any);
+		if (options?.onClose) socket.addEventListener("close", options.onClose as any);
+		if (options?.onError) socket.addEventListener("error", options.onError as any);
+
+		const onMessage = (event: any) => {
+			const message = parseRealtimeMessage<TResult>(event?.data ?? event);
+			if (options?.onMessage) options.onMessage(message, event);
+			if (message?.type === "data" && Array.isArray((message as any).data)) {
+				options?.onData?.((message as any).data as TResult[], message);
+			}
+		};
+
+		socket.addEventListener("message", onMessage as any);
+
+		if (options?.signal) {
+			const abortHandler = () => socket.close(1000, "aborted");
+			if (options.signal.aborted) abortHandler();
+			else options.signal.addEventListener("abort", abortHandler, { once: true });
+		}
+
+		return socket;
+	};
 }
 
 function normalizeBaseUrl(baseUrl?: string): string {
@@ -203,12 +380,33 @@ function normalizeBaseUrl(baseUrl?: string): string {
 	return baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
 }
 
+function normalizeWsBaseUrl(baseUrl?: string): string | undefined {
+	if (!baseUrl) return undefined;
+	if (baseUrl.startsWith("ws://") || baseUrl.startsWith("wss://")) {
+		return baseUrl.replace(/\\/+$/, "");
+	}
+	if (baseUrl.startsWith("https://")) return baseUrl.replace(/^https/, "wss").replace(/\\/$/, "");
+	if (baseUrl.startsWith("http://")) return baseUrl.replace(/^http/, "ws").replace(/\\/$/, "");
+	return baseUrl.replace(/\\/$/, "");
+}
+
 function buildUrl(baseUrl: string, path: string): string {
 	if (!baseUrl) {
 		return path;
 	}
 	const normalizedPath = path.startsWith("/") ? path : "/" + path;
 	return baseUrl + normalizedPath;
+}
+
+function buildRealtimeUrl(
+	baseUrl: string,
+	path: string,
+	params: URLSearchParams
+): string {
+	const normalizedBase = baseUrl.replace(/\\/+$/, "");
+	const normalizedPath = path.startsWith("/") ? path : "/" + path;
+	const query = params.toString();
+	return query ? \`\${normalizedBase}\${normalizedPath}?\${query}\` : \`\${normalizedBase}\${normalizedPath}\`;
 }
 
 function buildQueryUrl(
@@ -251,6 +449,21 @@ function serializeQueryValue(value: unknown): string {
 		return JSON.stringify(value);
 	}
 	return String(value);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function parseRealtimeMessage<TResult>(value: unknown): RealtimeMessage<TResult> {
+	if (typeof value === "string") {
+		try {
+			return JSON.parse(value) as RealtimeMessage<TResult>;
+		} catch {
+			return { type: "message", raw: value } as any;
+		}
+	}
+	return value as RealtimeMessage<TResult>;
 }
 
 function ensureJsonHeaders(headers?: HeadersInit): HeadersInit {
