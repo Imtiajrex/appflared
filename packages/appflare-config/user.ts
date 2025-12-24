@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/src/schema-types";
 export const getUsers = query({
 	args: {
 		id: z.string().optional(),
+		name: z.string(),
 	},
 	handler: async (ctx, args) => {
 		return ctx.db.users.findMany({
