@@ -1,14 +1,17 @@
 import { z } from "zod";
 import { mutation, query } from "./_generated/src/schema-types";
-
 export const getUsers = query({
 	args: {
 		id: z.string().optional(),
 	},
 	handler: async (ctx, args) => {
-		const Users = await ctx.db.query("users").populate("roombas").find();
+		const users = ctx.db
+			.query("users")
+			.populate("roombas")
+			.populate("tickets")
+			.find();
 
-		return Users;
+		return users;
 	},
 });
 
@@ -19,6 +22,8 @@ export const createUser = mutation({
 	handler: async (ctx, args) => {
 		const User = await ctx.db.insert("users", {
 			name: args.name,
+			roombas: [],
+			tickets: [],
 		});
 
 		return User;

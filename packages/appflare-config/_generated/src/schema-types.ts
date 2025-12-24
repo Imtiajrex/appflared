@@ -32,8 +32,8 @@ export interface UsersDoc {
 	_id: Id<"users">;
 	_creationTime: number;
 	name: string;
-	tickets?: Array<Id<"tickets">>;
-	roombas?: Array<Id<"roombas">>;
+	tickets: Array<Id<"tickets">>;
+	roombas: Array<Id<"roombas">>;
 }
 
 export interface TableDocMap {

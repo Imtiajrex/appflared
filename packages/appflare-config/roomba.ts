@@ -18,11 +18,28 @@ export const createRoomba = mutation({
 		owner: z.string(),
 	},
 	handler: async (ctx, args) => {
-		const Roomba = await ctx.db.insert("roombas", {
+		const owner = await ctx.db
+			.query("users")
+			.where({ _id: args.owner })
+			.findOne();
+
+		if (!owner) {
+			throw new Error("Owner not found for the provided user id");
+		}
+
+		const roombaId = await ctx.db.insert("roombas", {
 			model: args.model,
 			owner: args.owner,
 		});
 
-		return Roomba;
+		await ctx.db
+			.update("users")
+			.where({ _id: args.owner })
+			.set({
+				roombas: Array.from(new Set([...(owner.roombas ?? []), roombaId])),
+			})
+			.exec();
+
+		return roombaId;
 	},
 });

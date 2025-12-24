@@ -61,7 +61,11 @@ export function createQueryBuilder<
 			const coll = params.getCollection(params.table as string);
 			const options: FindOptions = {};
 			if (selectedKeys) {
-				options.projection = buildProjection(selectedKeys);
+				// Ensure referenced ids are available for populate even when the caller selected a subset.
+				const projectionKeys = Array.from(
+					new Set([...selectedKeys, ...populateKeys])
+				);
+				options.projection = buildProjection(projectionKeys);
 			}
 			const normalizedFilter = normalizeIdFilter(filter);
 			let cursor = coll.find(normalizedFilter ?? ({} as any), options);
