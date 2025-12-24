@@ -38,9 +38,22 @@ type AnyArgsShape = Record<string, AnyValidator>;
 
 type AnyHandlerDefinition = QueryDefinition<AnyArgsShape, unknown> | MutationDefinition<AnyArgsShape, unknown>;
 
+type Simplify<T> = { [K in keyof T]: T[K] };
+
+type OptionalKeys<TArgs extends QueryArgsShape> = {
+	[K in keyof TArgs]: TArgs[K] extends z.ZodOptional<any> | z.ZodDefault<any> ? K : never;
+}[keyof TArgs];
+
+type RequiredKeys<TArgs extends QueryArgsShape> = Exclude<keyof TArgs, OptionalKeys<TArgs>>;
+
+type HandlerArgsFromShape<TArgs extends QueryArgsShape> = Simplify<
+	Partial<Pick<InferQueryArgs<TArgs>, OptionalKeys<TArgs>>> &
+		Pick<InferQueryArgs<TArgs>, RequiredKeys<TArgs>>
+>;
+
 type HandlerArgs<THandler extends AnyHandlerDefinition> =
 	THandler extends { args: infer TArgs extends QueryArgsShape }
-		? InferQueryArgs<TArgs>
+		? HandlerArgsFromShape<TArgs>
 		: never;
 
 type HandlerResult<THandler extends AnyHandlerDefinition> = THandler extends {

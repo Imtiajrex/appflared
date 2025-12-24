@@ -46,6 +46,14 @@ type ParsedSubscription =
 	| { ok: true; value: Subscription }
 	| { ok: false; error: string };
 
+const resolveDatabase = (env: any) => {
+	if (env?.DB) return env.DB as any;
+	if (env?.MONGO_DB) return getDatabase(env.MONGO_DB) as any;
+	throw new Error(
+		"WebSocketHibernationServer requires either env.DB or env.MONGO_DB to be set."
+	);
+};
+
 export class WebSocketHibernationServer extends DurableObject {
 	private readonly env: any;
 	private subscriptions: Map<WebSocket, Subscription>;
@@ -299,7 +307,7 @@ export class WebSocketHibernationServer extends DurableObject {
 	private getDb(): MongoDbContext<TableNames, TableDocMap> {
 		if (!this.db) {
 			this.db = createMongoDbContext<TableNames, TableDocMap>({
-				db: getDatabase(this.env.MONGO_DB) as any,
+				db: resolveDatabase(this.env),
 				schema,
 			});
 		}

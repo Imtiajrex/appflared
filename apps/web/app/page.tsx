@@ -20,7 +20,6 @@ export default function Page() {
 			id: undefined,
 		},
 	});
-	api.queries.user.getUsers.schema;
 	const addUser = useMutation(api.mutations.user.createUser);
 
 	return (
