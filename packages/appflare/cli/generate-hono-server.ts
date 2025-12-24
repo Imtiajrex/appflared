@@ -62,6 +62,18 @@ export function generateHonoServer(params: {
 				`\t\tconst body = c.req.valid("json");\n` +
 				`\t\tconst ctx = await createContext(c);\n` +
 				`\t\tconst result = await ${local}.handler(ctx as any, body as any);\n` +
+				`\t\tif (notifyMutation) {\n` +
+				`\t\t\ttry {\n` +
+				`\t\t\t\tawait notifyMutation({\n` +
+				`\t\t\t\t\t table: ${JSON.stringify(m.fileName)},\n` +
+				`\t\t\t\t\t handler: { file: ${JSON.stringify(m.fileName)}, name: ${JSON.stringify(m.name)} },\n` +
+				`\t\t\t\t\t args: body,\n` +
+				`\t\t\t\t\t result,\n` +
+				`\t\t\t\t});\n` +
+				`\t\t\t} catch (err) {\n` +
+				`\t\t\t\tconsole.error("Appflare realtime notification failed", err);\n` +
+				`\t\t\t}\n` +
+				`\t\t}\n` +
 				`\t\treturn c.json(result, 200);\n` +
 				`\t}\n` +
 				`);`
@@ -93,6 +105,26 @@ export type AppflareDbContext = MongoDbContext<TableNames, TableDocMap>;
 
 export type AppflareServerContext = { db: AppflareDbContext };
 
+export type MutationNotification = {
+	table: TableNames;
+	handler: { file: string; name: string };
+	args: unknown;
+	result: unknown;
+};
+
+type DurableObjectNamespaceLike = {
+	idFromName(name: string): any;
+	get(id: any): { fetch(input: any, init?: RequestInit): Promise<Response> };
+};
+
+type MutationNotifier = (payload: MutationNotification) => Promise<void>;
+
+type RealtimeOptions = {
+	notify?: MutationNotifier;
+	durableObject?: DurableObjectNamespaceLike;
+	durableObjectName?: string;
+};
+
 export type AppflareHonoServerOptions = {
 	/** Provide a static Mongo Db instance. If omitted, set getDb instead. */
 	db?: import("mongodb").Db;
@@ -105,6 +137,7 @@ export type AppflareHonoServerOptions = {
 	) => AppflareServerContext | Promise<AppflareServerContext>;
 	collectionName?: (table: TableNames) => string;
 	corsOrigin?: string | string[];
+	realtime?: RealtimeOptions;
 };
 
 export function createAppflareHonoServer(options: AppflareHonoServerOptions): Hono {
@@ -134,6 +167,7 @@ export function createAppflareHonoServer(options: AppflareHonoServerOptions): Ho
 
 	const createContext =
 		options.createContext ?? ((_c, db) => ({ db } as AppflareServerContext));
+	const notifyMutation = createMutationNotifier(options.realtime);
 	const app = new Hono();
 	app.use(
 		cors({
@@ -151,6 +185,27 @@ export function createAppflareHonoServer(options: AppflareHonoServerOptions): Ho
 		.join("\n\n\t")}
 
 	return app;
+}
+
+function createMutationNotifier(
+	options?: RealtimeOptions
+): MutationNotifier | undefined {
+	if (!options) return undefined;
+	if (options.notify) return options.notify;
+	if (options.durableObject) {
+		return async (payload: MutationNotification) => {
+			const id = options.durableObject!.idFromName(
+				options.durableObjectName ?? "primary"
+			);
+			const stub = options.durableObject!.get(id);
+			await stub.fetch("http://appflare-realtime/notify", {
+				method: "POST",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify(payload),
+			});
+		};
+	}
+	return undefined;
 }
 
 const app = createAppflareHonoServer({

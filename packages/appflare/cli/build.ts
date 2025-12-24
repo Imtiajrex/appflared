@@ -8,6 +8,7 @@ import {
 	discoverHandlers,
 	generateApiClient,
 	generateHonoServer,
+	generateWebsocketDurableObject,
 } from "./handlers";
 
 export async function buildFromConfig(params: {
@@ -57,6 +58,15 @@ export async function buildFromConfig(params: {
 		schemaPathAbs,
 	});
 	await fs.writeFile(path.join(outDirAbs, "server", "server.ts"), serverTs);
+
+	const websocketDoTs = generateWebsocketDurableObject({
+		outDirAbs,
+		schemaPathAbs,
+	});
+	await fs.writeFile(
+		path.join(outDirAbs, "server", "websocket-hibernation-server.ts"),
+		websocketDoTs
+	);
 
 	if (emit) {
 		// Remove previous emit output to avoid stale files lingering.

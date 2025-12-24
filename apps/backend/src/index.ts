@@ -1,8 +1,8 @@
 import { createAppflareHonoServer } from 'appflare-config/_generated/server/server';
+import { WebSocketHibernationServer } from 'appflare-config/_generated/server/websocket-hibernation-server';
 import { MONGO_DURABLE_OBJECT } from 'cloudflare-do-mongo/do';
 import { getDatabase } from 'cloudflare-do-mongo';
 import { Db } from 'mongodb';
-import { WebSocketHibernationServer } from './websocket-hibernation-server';
 
 export default {
 	async fetch(request, env, ctx): Promise<Response> {

@@ -9,6 +9,7 @@ import {
 	generateApiClient,
 	generateDbHandlers,
 	generateHonoServer,
+	generateWebsocketDurableObject,
 } from "./handlers";
 import { generateSchemaTypes, getSchemaTableNames } from "./schema";
 import { runTscEmit, writeEmitTsconfig } from "./tsc";
@@ -130,6 +131,15 @@ async function buildFromConfig(params: {
 		schemaPathAbs,
 	});
 	await fs.writeFile(path.join(outDirAbs, "server", "server.ts"), serverTs);
+
+	const websocketDoTs = generateWebsocketDurableObject({
+		outDirAbs,
+		schemaPathAbs,
+	});
+	await fs.writeFile(
+		path.join(outDirAbs, "server", "websocket-hibernation-server.ts"),
+		websocketDoTs
+	);
 
 	if (emit) {
 		// Remove previous emit output to avoid stale files lingering.
