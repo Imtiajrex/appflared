@@ -105,6 +105,17 @@ export type AppflareDbContext = MongoDbContext<TableNames, TableDocMap>;
 
 export type AppflareServerContext = { db: AppflareDbContext };
 
+export function createAppflareDbContext(params: {
+	db: import("mongodb").Db;
+	collectionName?: (table: TableNames) => string;
+}): AppflareDbContext {
+	return createMongoDbContext<TableNames, TableDocMap>({
+		db: params.db,
+		schema,
+		collectionName: params.collectionName,
+	});
+}
+
 export type MutationNotification = {
 	table: TableNames;
 	handler: { file: string; name: string };
@@ -151,9 +162,8 @@ function normalizeTableName(table: string): TableNames {
 export function createAppflareHonoServer(options: AppflareHonoServerOptions): Hono {
 	const fixedDb =
 		options.db &&
-		createMongoDbContext<TableNames, TableDocMap>({
+		createAppflareDbContext({
 			db: options.db,
-			schema,
 			collectionName: options.collectionName,
 		});
 
@@ -166,9 +176,8 @@ export function createAppflareHonoServer(options: AppflareHonoServerOptions): Ho
 	const resolveDb = async (c: HonoContext): Promise<AppflareDbContext> => {
 		if (fixedDb) return fixedDb;
 		const db = await options.getDb!(c);
-		return createMongoDbContext<TableNames, TableDocMap>({
+		return createAppflareDbContext({
 			db,
-			schema,
 			collectionName: options.collectionName,
 		});
 	};

@@ -9,6 +9,7 @@ export function generateWebsocketDurableObject(params: {
 		params.schemaPathAbs
 	);
 	const schemaTypesImportPath = "../src/schema-types";
+	const serverImportPath = "./server";
 
 	return `/* eslint-disable */
 /**
@@ -18,7 +19,9 @@ export function generateWebsocketDurableObject(params: {
 
 import { DurableObject } from "cloudflare:workers";
 import { getDatabase } from "cloudflare-do-mongo";
-import { createMongoDbContext, type MongoDbContext } from "appflare/server/db";
+import { createAppflareDbContext, type AppflareDbContext } from ${JSON.stringify(
+		serverImportPath
+	)};
 import schema from ${JSON.stringify(schemaImportPath)};
 import type {
 	QueryWhere,
@@ -26,6 +29,7 @@ import type {
 	TableDocMap,
 	TableNames,
 } from ${JSON.stringify(schemaTypesImportPath)};
+import { MongoClient } from "mongodb";
 
 export type MutationNotification = {
 	table: TableNames;
@@ -40,6 +44,8 @@ type Subscription = {
 	orderBy?: QuerySort<TableNames>;
 	take?: number;
 	skip?: number;
+	select?: unknown;
+	include?: unknown;
 };
 
 type ParsedSubscription =
@@ -47,17 +53,14 @@ type ParsedSubscription =
 	| { ok: false; error: string };
 
 const resolveDatabase = (env: any) => {
-	if (env?.DB) return env.DB as any;
-	if (env?.MONGO_DB) return getDatabase(env.MONGO_DB) as any;
-	throw new Error(
-		"WebSocketHibernationServer requires either env.DB or env.MONGO_DB to be set."
-	);
+	const client = new MongoClient(env.MONGO_URI);
+	const db = client.db(env.MONGO_DB);
+	return db;
 };
 
 export class WebSocketHibernationServer extends DurableObject {
-	private readonly env: any;
 	private subscriptions: Map<WebSocket, Subscription>;
-	private db: MongoDbContext<TableNames, TableDocMap> | null;
+	private db: AppflareDbContext | null;
 
 	constructor(ctx: DurableObjectState, env: any) {
 		super(ctx, env);
@@ -83,7 +86,7 @@ export class WebSocketHibernationServer extends DurableObject {
 
 		if (request.headers.get("Upgrade") === "websocket" && pathname === "/ws") {
 			const parsed = this.parseSubscription(url.searchParams);
-			if (!parsed.ok) {
+			if (parsed.ok === false) {
 				return new Response(parsed.error, { status: 400 });
 			}
 			return this.handleSubscribe(parsed.value);
@@ -162,6 +165,8 @@ export class WebSocketHibernationServer extends DurableObject {
 
 		const where = parseJson<QueryWhere<TableNames>>("where");
 		const orderBy = parseJson<QuerySort<TableNames>>("orderBy");
+		const select = parseJson<unknown>("select");
+		const include = parseJson<unknown>("include");
 		const takeStr = params.get("take") ?? params.get("limit");
 		const skipStr = params.get("skip") ?? params.get("offset");
 
@@ -171,6 +176,8 @@ export class WebSocketHibernationServer extends DurableObject {
 				table,
 				where,
 				orderBy,
+				select,
+				include,
 				take: takeStr ? Number(takeStr) : undefined,
 				skip: skipStr ? Number(skipStr) : undefined,
 			},
@@ -300,15 +307,16 @@ export class WebSocketHibernationServer extends DurableObject {
 			orderBy: sub.orderBy as any,
 			skip: sub.skip,
 			take: sub.take,
+			select: sub.select as any,
+			include: sub.include as any,
 		});
 		return data ?? [];
 	}
 
-	private getDb(): MongoDbContext<TableNames, TableDocMap> {
+	private getDb(): AppflareDbContext {
 		if (!this.db) {
-			this.db = createMongoDbContext<TableNames, TableDocMap>({
+			this.db = createAppflareDbContext({
 				db: resolveDatabase(this.env),
-				schema,
 			});
 		}
 		return this.db;
@@ -319,6 +327,8 @@ export class WebSocketHibernationServer extends DurableObject {
 			table: sub.table,
 			where: sub.where ?? null,
 			orderBy: sub.orderBy ?? null,
+			select: sub.select ?? null,
+			include: sub.include ?? null,
 			take: sub.take ?? null,
 			skip: sub.skip ?? null,
 		});
