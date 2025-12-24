@@ -1,6 +1,6 @@
 import { createAppflareHonoServer } from 'appflare-config/_generated/server/server';
 import { MONGO_DURABLE_OBJECT } from 'cloudflare-do-mongo/do';
-import { getDatabase } from 'cloudflare-do-mongo/index';
+import { getDatabase } from 'cloudflare-do-mongo';
 import { Db } from 'mongodb';
 import { WebSocketHibernationServer } from './websocket-hibernation-server';
 

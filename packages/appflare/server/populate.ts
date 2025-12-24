@@ -11,12 +11,6 @@ export async function applyPopulate(params: {
 	refs: SchemaRefMap;
 	getCollection: (table: string) => Collection<Document>;
 }) {
-	console.log("[populate] start", {
-		table: params.currentTable,
-		populateKeys: params.populateKeys,
-		docCount: params.docs.length,
-		selectedKeys: params.selectedKeys,
-	});
 	const tableRefs = params.refs.get(params.currentTable) ?? new Map();
 
 	const ensureStringId = (val: unknown): string | null => {
@@ -31,22 +25,14 @@ export async function applyPopulate(params: {
 		return null;
 	};
 
-	const pushId = (val: unknown, ids: string[]) => {
-		if (!val) return;
-		if (typeof val === "string") {
-			ids.push(val);
-			return;
-		}
-		if (val instanceof ObjectId) {
-			ids.push(val.toHexString());
-			return;
-		}
-		if (typeof val === "object" && "_id" in (val as any)) {
-			const maybeId = (val as any)._id;
-			if (typeof maybeId === "string") ids.push(maybeId);
-			if (maybeId instanceof ObjectId) ids.push(maybeId.toHexString());
-		}
-	};
+	const docIds = params.docs
+		.map((doc) => {
+			const id = ensureStringId(doc._id);
+			return id ? normalizeIdValue(id) : null;
+		})
+		.filter((v): v is string | ObjectId => Boolean(v));
+
+	if (docIds.length === 0) return;
 
 	// Build reverse ref lookup so populate can work even when the current table
 	// doesn't store the forward reference (e.g., populate tickets on users by
@@ -60,112 +46,110 @@ export async function applyPopulate(params: {
 		}
 	}
 
+	const buildLookupMap = (rows: Array<Record<string, unknown>>) => {
+		const byId = new Map<string, Record<string, unknown>[]>();
+		for (const row of rows) {
+			const id = ensureStringId(row._id);
+			if (!id) continue;
+			const items = Array.isArray((row as any).__pop)
+				? ((row as any).__pop as Array<Record<string, unknown>>)
+				: [];
+			items.forEach(stringifyIdField);
+			byId.set(id, items);
+		}
+		return byId;
+	};
+
 	for (const key of params.populateKeys) {
 		const forwardTarget = tableRefs.get(key);
 		const backwardCandidates = reverseRefs.get(params.currentTable) ?? [];
 		const backward = backwardCandidates.find((c) => c.table === key);
 
-		console.log("[populate] key", {
-			key,
-			strategy: forwardTarget ? "forward" : backward ? "backward" : "skip",
-			forwardTarget,
-			backward,
-		});
-
-		// Decide strategy: forward (from field values) or backward (lookup by current _id).
+		// Prefer forward populate via $lookup when the table carries the ref.
 		if (forwardTarget) {
-			const ids: string[] = [];
-			for (const doc of params.docs) {
+			const hasForwardValues = params.docs.some((doc) => {
 				const value = doc[key];
-				if (Array.isArray(value)) {
-					for (const v of value) pushId(v, ids);
-					continue;
-				}
-				pushId(value, ids);
-			}
-			const uniqueIds = Array.from(new Set(ids));
-			if (uniqueIds.length === 0) {
-				console.log(
-					"[populate] forward ids empty, attempting backward if available",
-					{ key }
-				);
-				if (!backward) continue;
-			} else {
-				console.log("[populate] forward ids", {
-					key,
-					count: uniqueIds.length,
-					ids: uniqueIds,
-				});
+				return Array.isArray(value)
+					? value.length > 0
+					: value !== undefined && value !== null;
+			});
 
-				const coll = params.getCollection(forwardTarget);
-				const related = (await coll
-					.find({ _id: { $in: uniqueIds.map(normalizeIdValue) } } as any)
+			if (hasForwardValues) {
+				const coll = params.getCollection(params.currentTable);
+				const pipeline = [
+					{ $match: { _id: { $in: docIds } } },
+					{
+						$lookup: {
+							from: forwardTarget,
+							localField: key,
+							foreignField: "_id",
+							as: "__pop",
+						},
+					},
+					{ $project: { _id: 1, __pop: 1 } },
+				];
+
+				const populated = (await coll
+					.aggregate(pipeline as any)
 					.toArray()) as Array<Record<string, unknown>>;
-				related.forEach(stringifyIdField);
-				const byId = new Map<string, Record<string, unknown>>();
-				for (const r of related) {
-					const id = ensureStringId(r._id);
-					if (id) byId.set(id, r);
-				}
-				console.log("[populate] forward fetched", {
-					key,
-					count: related.length,
-				});
+
+				const byId = buildLookupMap(populated);
 
 				for (const doc of params.docs) {
-					const value = doc[key];
-					if (Array.isArray(value)) {
-						doc[key] = value
+					const docId = ensureStringId(doc._id);
+					if (!docId) continue;
+					const populatedDocs = byId.get(docId) ?? [];
+					const currentValue = doc[key];
+
+					if (Array.isArray(currentValue)) {
+						const byRelId = new Map<string, Record<string, unknown>>();
+						for (const rel of populatedDocs) {
+							const relId = ensureStringId(rel._id);
+							if (relId) byRelId.set(relId, rel);
+						}
+						doc[key] = currentValue
 							.map((v) => {
-								const id = ensureStringId(v);
-								return id ? (byId.get(id) ?? null) : null;
+								const relId = ensureStringId(v);
+								return relId ? (byRelId.get(relId) ?? null) : null;
 							})
 							.filter((v): v is Record<string, unknown> => Boolean(v));
 						continue;
 					}
-					const id = ensureStringId(value);
-					if (!id) continue;
-					doc[key] = byId.get(id) ?? value;
+
+					const relId = ensureStringId(currentValue);
+					doc[key] = relId
+						? (populatedDocs.find((v) => ensureStringId(v._id) === relId) ??
+							currentValue)
+						: (populatedDocs[0] ?? currentValue);
 				}
+
 				continue;
 			}
+
+			if (!backward) continue;
 		}
 
 		// Backward populate: find docs in another table that reference this table's _id.
 		if (backward) {
-			const parentIds = params.docs
-				.map((d) => ensureStringId(d._id))
-				.filter((v): v is string => Boolean(v));
-			if (parentIds.length === 0) continue;
-			console.log("[populate] backward parents", {
-				key,
-				count: parentIds.length,
-				parentIds,
-			});
+			const coll = params.getCollection(params.currentTable);
+			const pipeline = [
+				{ $match: { _id: { $in: docIds } } },
+				{
+					$lookup: {
+						from: backward.table,
+						localField: "_id",
+						foreignField: backward.field,
+						as: "__pop",
+					},
+				},
+				{ $project: { _id: 1, __pop: 1 } },
+			];
 
-			const coll = params.getCollection(backward.table);
-			const related = (await coll
-				.find({
-					[backward.field]: { $in: parentIds.map(normalizeIdValue) },
-				} as any)
+			const populated = (await coll
+				.aggregate(pipeline as any)
 				.toArray()) as Array<Record<string, unknown>>;
-			related.forEach(stringifyIdField);
-			console.log("[populate] backward fetched", {
-				key,
-				count: related.length,
-				table: backward.table,
-			});
 
-			const grouped = new Map<string, Record<string, unknown>[]>();
-			for (const r of related) {
-				const fk = ensureStringId((r as any)[backward.field]);
-				if (!fk) continue;
-				const list = grouped.get(fk) ?? [];
-				list.push(r);
-				grouped.set(fk, list);
-			}
-			console.log("[populate] backward grouped", { key, groups: grouped.size });
-
+			const grouped = buildLookupMap(populated);
 			for (const doc of params.docs) {
 				const id = ensureStringId(doc._id);
 				if (!id) continue;
@@ -173,8 +157,4 @@ export async function applyPopulate(params: {
 			}
 		}
 	}
-	console.log("[populate] done", {
-		table: params.currentTable,
-		keys: params.populateKeys,
-	});
 }
