@@ -60,6 +60,7 @@ export async function buildFromConfig(params: {
 	await fs.writeFile(path.join(outDirAbs, "server", "server.ts"), serverTs);
 
 	const websocketDoTs = generateWebsocketDurableObject({
+		handlers,
 		outDirAbs,
 		schemaPathAbs,
 	});

@@ -33,7 +33,10 @@ export function generateQueriesClientLines(
 						`\t\t\t},\n` +
 						`\t\t\t{\n` +
 						`\t\t\t\tschema: createHandlerSchema(${handlerAccessor}.args),\n` +
-						`\t\t\t\twebsocket: createHandlerWebsocket<${pascal}Args, ${pascal}Result>(realtime, { defaultTable: ${JSON.stringify(normalizeTableName(fileName))} }),\n` +
+						`\t\t\t\twebsocket: createHandlerWebsocket<${pascal}Args, ${pascal}Result>(realtime, {\n` +
+						`\t\t\t\t\tdefaultTable: ${JSON.stringify(normalizeTableName(fileName))},\n` +
+						`\t\t\t\t\tdefaultHandler: { file: ${JSON.stringify(fileName)}, name: ${JSON.stringify(h.name)} },\n` +
+						`\t\t\t\t}),\n` +
 						`\t\t\t\tpath: ${JSON.stringify(route)},\n` +
 						`\t\t\t}\n` +
 						`\t\t),`
@@ -74,7 +77,10 @@ export function generateMutationsClientLines(
 						`\t\t\t},\n` +
 						`\t\t\t{\n` +
 						`\t\t\t\tschema: createHandlerSchema(${handlerAccessor}.args),\n` +
-						`\t\t\t\twebsocket: createHandlerWebsocket<${pascal}Args, ${pascal}Result>(realtime, { defaultTable: ${JSON.stringify(normalizeTableName(fileName))} }),\n` +
+						`\t\t\t\twebsocket: createHandlerWebsocket<${pascal}Args, ${pascal}Result>(realtime, {\n` +
+						`\t\t\t\t\tdefaultTable: ${JSON.stringify(normalizeTableName(fileName))},\n` +
+						`\t\t\t\t\tdefaultHandler: { file: ${JSON.stringify(fileName)}, name: ${JSON.stringify(h.name)} },\n` +
+						`\t\t\t\t}),\n` +
 						`\t\t\t\tpath: ${JSON.stringify(route)},\n` +
 						`\t\t\t}\n` +
 						`\t\t),`

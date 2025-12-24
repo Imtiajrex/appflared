@@ -1,15 +1,55 @@
-import { toImportPathFromGeneratedServer } from "./utils";
+import {
+	DiscoveredHandler,
+	groupBy,
+	pascalCase,
+	toImportPathFromGeneratedServer,
+} from "./utils";
 
 export function generateWebsocketDurableObject(params: {
+	handlers: DiscoveredHandler[];
 	outDirAbs: string;
 	schemaPathAbs: string;
 }): string {
+	const queries = params.handlers.filter((h) => h.kind === "query");
 	const schemaImportPath = toImportPathFromGeneratedServer(
 		params.outDirAbs,
 		params.schemaPathAbs
 	);
 	const schemaTypesImportPath = "../src/schema-types";
 	const serverImportPath = "./server";
+
+	const localNameFor = (h: DiscoveredHandler): string =>
+		`__appflare_${pascalCase(h.fileName)}_${h.name}`;
+
+	const grouped = groupBy(queries, (h) => h.sourceFileAbs);
+	const importLines: string[] = [];
+	for (const [fileAbs, list] of Array.from(grouped.entries())) {
+		const specifiers = list
+			.slice()
+			.sort((a, b) => a.name.localeCompare(b.name))
+			.map((h) => `${h.name} as ${localNameFor(h)}`);
+		const importPath = toImportPathFromGeneratedServer(
+			params.outDirAbs,
+			fileAbs
+		);
+		importLines.push(
+			`import { ${specifiers.join(", ")} } from ${JSON.stringify(importPath)};`
+		);
+	}
+
+	const queryHandlerEntries = queries
+		.slice()
+		.sort((a, b) => {
+			if (a.fileName === b.fileName) return a.name.localeCompare(b.name);
+			return a.fileName.localeCompare(b.fileName);
+		})
+		.map(
+			(q) =>
+				`	${JSON.stringify(`${q.fileName}/${q.name}`)}: { file: ${JSON.stringify(
+					q.fileName
+				)}, name: ${JSON.stringify(q.name)}, definition: ${localNameFor(q)} },`
+		)
+		.join("\n");
 
 	return `/* eslint-disable */
 /**
@@ -18,28 +58,26 @@ export function generateWebsocketDurableObject(params: {
  */
 
 import { DurableObject } from "cloudflare:workers";
-import { getDatabase } from "cloudflare-do-mongo";
-import { createAppflareDbContext, type AppflareDbContext } from ${JSON.stringify(
-		serverImportPath
-	)};
+import {
+	createAppflareDbContext,
+	type AppflareDbContext,
+	type AppflareServerContext,
+} from ${JSON.stringify(serverImportPath)};
 import schema from ${JSON.stringify(schemaImportPath)};
 import type {
 	QueryWhere,
 	QuerySort,
-	TableDocMap,
 	TableNames,
 } from ${JSON.stringify(schemaTypesImportPath)};
 import { MongoClient } from "mongodb";
+${importLines.join("\n")}
 
-export type MutationNotification = {
-	table: TableNames;
-	handler: { file: string; name: string };
-	args: unknown;
-	result?: unknown;
-};
+type SubscriptionQueryHandler = { file: string; name: string };
 
 type Subscription = {
 	table: TableNames;
+	handler?: SubscriptionQueryHandler;
+	args?: unknown;
 	where?: QueryWhere<TableNames>;
 	orderBy?: QuerySort<TableNames>;
 	take?: number;
@@ -52,10 +90,73 @@ type ParsedSubscription =
 	| { ok: true; value: Subscription }
 	| { ok: false; error: string };
 
+type QueryArgsParser = { parse?: (value: unknown) => unknown };
+
+type QueryHandlerDefinition = {
+	args?: QueryArgsParser | unknown;
+	handler: (
+		ctx: import("./server").AppflareServerContext,
+		args: unknown
+	) => unknown | Promise<unknown>;
+};
+
+const queryHandlers = {
+${queryHandlerEntries}
+} satisfies Record<
+	string,
+	{ file: string; name: string; definition: QueryHandlerDefinition }
+>;
+
+type QueryHandlerKey = keyof typeof queryHandlers;
+
+const pascalCase = (str: string): string =>
+	str.replace(/(^\w|_\w)/g, (match) => match.replace("_", "").toUpperCase());
+const defaultHandlerForTable = (
+	table: TableNames
+): SubscriptionQueryHandler | null => {
+	const tableStr = table.toString();
+	const possible = [tableStr];
+	if (tableStr.endsWith("s")) {
+		possible.push(tableStr.slice(0, -1));
+	}
+	for (const candidate of possible) {
+		const key = candidate + "/get" + pascalCase(candidate);
+		if (key in queryHandlers) {
+			return { file: candidate, name: "get" + pascalCase(candidate) };
+		}
+	}
+	return null;
+};
+
 const resolveDatabase = (env: any) => {
 	const client = new MongoClient(env.MONGO_URI);
 	const db = client.db(env.MONGO_DB);
 	return db;
+};
+
+const handlerKey = (handler: SubscriptionQueryHandler): string =>
+	handler.file + "/" + handler.name;
+
+const resolveQueryHandler = (
+	handler: SubscriptionQueryHandler | undefined
+): QueryHandlerDefinition | null => {
+	if (!handler) return null;
+	const key = handlerKey(handler) as QueryHandlerKey;
+	return queryHandlers[key]?.definition ?? null;
+};
+
+const isKnownQueryHandler = (
+	handler: SubscriptionQueryHandler | undefined
+): boolean => {
+	if (!handler) return false;
+	return handlerKey(handler) in queryHandlers;
+};
+
+export type MutationNotification = {
+	table: TableNames;
+	handler: { file: string; name: string };
+	args: unknown;
+	result?: unknown;
 };
 
 export class WebSocketHibernationServer extends DurableObject {
@@ -93,9 +194,9 @@ export class WebSocketHibernationServer extends DurableObject {
 		}
 
 		if (pathname === "/notify" && request.method === "POST") {
-			const payload = (await request.json().catch(() => null)) as
-				| MutationNotification
-				| null;
+			const payload = (await request
+				.json()
+				.catch(() => null)) as MutationNotification | null;
 			if (!payload) {
 				return new Response("Invalid mutation payload", { status: 400 });
 			}
@@ -158,15 +259,30 @@ export class WebSocketHibernationServer extends DurableObject {
 			try {
 				return JSON.parse(raw) as T;
 			} catch (err) {
-				console.error(\`Failed to parse \${key} search param\`, err);
+				console.error("Failed to parse " + key + " search param", err);
 				return undefined;
 			}
 		};
+
+		const handler = this.parseHandlerRef(params);
+		let resolvedHandler = handler ?? defaultHandlerForTable(table) ?? undefined;
+
+		if (resolvedHandler && !isKnownQueryHandler(resolvedHandler)) {
+			return {
+				ok: false,
+				error:
+					"Unknown query handler: " +
+					resolvedHandler.file +
+					"/" +
+					resolvedHandler.name,
+			};
+		}
 
 		const where = parseJson<QueryWhere<TableNames>>("where");
 		const orderBy = parseJson<QuerySort<TableNames>>("orderBy");
 		const select = parseJson<unknown>("select");
 		const include = parseJson<unknown>("include");
+		const args = parseJson<unknown>("args");
 		const takeStr = params.get("take") ?? params.get("limit");
 		const skipStr = params.get("skip") ?? params.get("offset");
 
@@ -174,6 +290,8 @@ export class WebSocketHibernationServer extends DurableObject {
 			ok: true,
 			value: {
 				table,
+				handler: resolvedHandler,
+				args,
 				where,
 				orderBy,
 				select,
@@ -184,6 +302,43 @@ export class WebSocketHibernationServer extends DurableObject {
 		};
 	}
 
+	private parseHandlerRef(
+		params: URLSearchParams
+	): SubscriptionQueryHandler | undefined {
+		const handlerCombined = params.get("handler");
+		const handlerFile =
+			params.get("handlerFile") ?? params.get("handler_file") ?? undefined;
+		const handlerName =
+			params.get("handlerName") ?? params.get("handler_name") ?? undefined;
+
+		const fromCombined = this.tryParseHandlerCombined(handlerCombined);
+		if (fromCombined) return fromCombined;
+		if (handlerFile && handlerName) {
+			return { file: handlerFile, name: handlerName };
+		}
+		return undefined;
+	}
+
+	private tryParseHandlerCombined(
+		combined: string | null
+	): SubscriptionQueryHandler | undefined {
+		if (!combined) return undefined;
+
+		try {
+			const parsed = JSON.parse(combined) as SubscriptionQueryHandler;
+			if (parsed && parsed.file && parsed.name) return parsed;
+		} catch (err) {
+			// ignore JSON parse failures and try other formats
+		}
+
+		if (combined.includes("/")) {
+			const [file, name] = combined.split("/");
+			if (file && name) return { file, name };
+		}
+
+		return undefined;
+	}
+
 	private async handleNotification(
 		payload: MutationNotification
 	): Promise<void> {
@@ -192,7 +347,7 @@ export class WebSocketHibernationServer extends DurableObject {
 		);
 		if (matches.length === 0) return;
 
-		const cache = new Map<string, unknown[]>();
+		const cache = new Map<string, unknown>();
 		for (const [, sub] of matches) {
 			const key = this.subscriptionKey(sub);
 			if (!cache.has(key)) {
@@ -202,7 +357,7 @@ export class WebSocketHibernationServer extends DurableObject {
 
 		for (const [socket, sub] of matches) {
 			const key = this.subscriptionKey(sub);
-			const data = cache.get(key) ?? [];
+			const data = cache.get(key);
 			try {
 				socket.send(
 					JSON.stringify({
@@ -243,7 +398,12 @@ export class WebSocketHibernationServer extends DurableObject {
 			return result as Record<string, unknown>;
 		}
 		const args = payload.args as any;
-		if (args && typeof args === "object" && args.data && typeof args.data === "object") {
+		if (
+			args &&
+			typeof args === "object" &&
+			args.data &&
+			typeof args.data === "object"
+		) {
 			return args.data as Record<string, unknown>;
 		}
 		return null;
@@ -296,11 +456,18 @@ export class WebSocketHibernationServer extends DurableObject {
 		return true;
 	}
 
-	private async fetchData(sub: Subscription): Promise<unknown[]> {
+	private async fetchData(sub: Subscription): Promise<unknown> {
+		const query = resolveQueryHandler(sub.handler);
+		if (query) {
+			const ctx = this.createHandlerContext();
+			const parsedArgs = this.parseHandlerArgs(query, sub.where);
+			return await query.handler(ctx, parsedArgs);
+		}
+
 		const db = this.getDb();
 		const table = db[sub.table] as any;
 		if (!table || typeof table.findMany !== "function") {
-			throw new Error(\`Unknown table: \${sub.table}\`);
+			throw new Error("Unknown table: " + sub.table);
 		}
 		const data = await table.findMany({
 			where: sub.where as any,
@@ -311,6 +478,27 @@ export class WebSocketHibernationServer extends DurableObject {
 			include: sub.include as any,
 		});
 		return data ?? [];
+	}
+
+	private parseHandlerArgs(
+		query: QueryHandlerDefinition,
+		args: unknown
+	): unknown {
+		if (query.args && typeof query.args === "object") {
+			const parser = query.args as QueryArgsParser;
+			if (parser.parse && typeof parser.parse === "function") {
+				try {
+					return parser.parse(args ?? {});
+				} catch (err) {
+					console.error("Failed to parse handler args", err);
+				}
+			}
+		}
+		return args ?? {};
+	}
+
+	private createHandlerContext(): AppflareServerContext {
+		return { db: this.getDb() } as AppflareServerContext;
 	}
 
 	private getDb(): AppflareDbContext {
@@ -325,6 +513,8 @@ export class WebSocketHibernationServer extends DurableObject {
 	private subscriptionKey(sub: Subscription): string {
 		return JSON.stringify({
 			table: sub.table,
+			handler: sub.handler ?? null,
+			args: sub.args ?? null,
 			where: sub.where ?? null,
 			orderBy: sub.orderBy ?? null,
 			select: sub.select ?? null,
@@ -338,7 +528,7 @@ export class WebSocketHibernationServer extends DurableObject {
 		if (!table) return null;
 		const schemaTables = schema as Record<string, unknown>;
 		if (schemaTables[table]) return table as TableNames;
-		const plural = \`\${table}s\`;
+		const plural = table + "s";
 		if (schemaTables[plural]) return plural as TableNames;
 		return null;
 	}

@@ -8,6 +8,7 @@ export const getUsers = query({
 	handler: async (ctx, args) => {
 		const where: Record<string, string | undefined> = { name: args.name };
 		if (args.id) where._id = args.id;
+		console.log("args", args);
 
 		return ctx.db.users.findMany({
 			where,

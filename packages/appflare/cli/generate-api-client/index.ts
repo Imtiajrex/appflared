@@ -90,6 +90,9 @@ export type RealtimeMessage<TResult> = {
 export type HandlerWebsocketOptions<TResult> = {
 	baseUrl?: string;
 	table?: string;
+	handler?: { file: string; name: string };
+	handlerFile?: string;
+	handlerName?: string;
 	where?: Record<string, unknown>;
 	orderBy?: Record<string, unknown>;
 	take?: number;
@@ -215,7 +218,7 @@ function createHandlerSchema<TArgs extends QueryArgsShape>(
 const UTILITY_FUNCTIONS_TEMPLATE_PART2 = `
 function createHandlerWebsocket<TArgs, TResult>(
 	realtime: ResolvedRealtimeConfig,
-	defaults: { defaultTable: string }
+	defaults: { defaultTable: string; defaultHandler: { file: string; name: string } }
 ): HandlerWebsocket<TArgs, TResult> {
 	return (args, options) => {
 		const baseUrl = normalizeWsBaseUrl(options?.baseUrl ?? realtime.baseUrl);
@@ -230,6 +233,15 @@ function createHandlerWebsocket<TArgs, TResult>(
 			? tableParam
 			: tableParam + "s";
 		params.set("table", normalizedTable);
+
+		const handlerRef =
+			options?.handler ??
+			(options?.handlerFile && options?.handlerName
+				? { file: options.handlerFile, name: options.handlerName }
+				: defaults.defaultHandler);
+		if (handlerRef) {
+			params.set("handler", JSON.stringify(handlerRef));
+		}
 		const where = options?.where ?? (isPlainObject(args) ? (args as Record<string, unknown>) : undefined);
 		if (where && Object.keys(where).length > 0) {
 			params.set("where", JSON.stringify(where));

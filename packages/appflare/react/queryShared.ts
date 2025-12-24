@@ -10,6 +10,9 @@ export type RealtimeMessage<TResult> = {
 export type HandlerWebsocketOptions<TResult> = {
 	baseUrl?: string;
 	table?: string;
+	handler?: { file: string; name: string };
+	handlerFile?: string;
+	handlerName?: string;
 	where?: Record<string, unknown>;
 	orderBy?: Record<string, unknown>;
 	take?: number;
