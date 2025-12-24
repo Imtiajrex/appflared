@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import {
 	InfiniteData,
 	QueryKey,
@@ -11,7 +11,10 @@ import {
 	HandlerWithRealtime,
 	RealtimeHookOptions,
 	RealtimeMessage,
-} from "./useQuery";
+	buildQueryKey,
+	stableSerialize,
+	useRealtimeSubscription,
+} from "./queryShared";
 
 export type PaginatedResult<TResult, TCursor = unknown> = {
 	items: TResult[];
@@ -102,31 +105,37 @@ export function usePaginatedQuery<
 		"handler"
 	>
 ): UseAppflarePaginatedQueryResult<TResult, TCursor, TError> {
-	const normalizedOptions =
-		typeof optionsOrHandler === "function"
-			? ({
-					handler: optionsOrHandler,
-					...(options ?? {}),
-				} as UseAppflarePaginatedQueryOptions<TArgs, TResult, TCursor, TError>)
-			: optionsOrHandler;
+	const normalizedOptions = useMemo(
+		() =>
+			typeof optionsOrHandler === "function"
+				? ({
+						handler: optionsOrHandler,
+						...(options ?? {}),
+					} as UseAppflarePaginatedQueryOptions<
+						TArgs,
+						TResult,
+						TCursor,
+						TError
+					>)
+				: optionsOrHandler,
+		[optionsOrHandler, options]
+	);
 
-	const {
-		handler,
-		args,
-		queryKey,
-		pageParamKey = "cursor",
-		initialPageParam,
-		getNextPageParam,
-		getPreviousPageParam,
-		queryOptions,
-		realtime,
-	} = normalizedOptions;
+	const realtime = normalizedOptions.realtime;
+	const handler = normalizedOptions.handler;
+	const args = normalizedOptions.args;
+	const queryKey = normalizedOptions.queryKey;
+	const queryOptions = normalizedOptions.queryOptions;
+
+	const pageParamKey = normalizedOptions.pageParamKey ?? "cursor";
+	const initialPageParam = normalizedOptions.initialPageParam;
+	const getNextPageParam = normalizedOptions.getNextPageParam;
+	const getPreviousPageParam = normalizedOptions.getPreviousPageParam;
 
 	const queryClient = useQueryClient();
-	const websocketRef = useRef<WebSocket | null>(null);
 	const argsKey = useMemo(() => stableSerialize(args), [args]);
 	const finalQueryKey = useMemo<QueryKey>(
-		() => queryKey ?? [handler?.path ?? "appflare-handler", argsKey],
+		() => buildQueryKey(queryKey, handler, argsKey),
 		[queryKey, handler, argsKey]
 	);
 
@@ -149,84 +158,43 @@ export function usePaginatedQuery<
 		...(queryOptions ?? {}),
 	});
 
-	useEffect(() => {
-		const hasWebsocket = typeof handler.websocket === "function";
-		const realtimeOptions =
-			typeof realtime === "object"
-				? (realtime as RealtimeHookOptions<PaginatedResult<TResult, TCursor>>)
-				: {};
-		const enabled =
-			realtime === true ||
-			(typeof realtime === "object" && realtimeOptions.enabled !== false);
+	const handleIncomingPage = useCallback(
+		(
+			data?:
+				| PaginatedResult<TResult, TCursor>[]
+				| PaginatedResult<TResult, TCursor>
+				| null,
+			_message?: RealtimeMessage<PaginatedResult<TResult, TCursor>>
+		) => {
+			const nextFirstPage = Array.isArray(data) ? data[0] : undefined;
+			if (!nextFirstPage) return;
+			queryClient.setQueryData<
+				InfiniteData<PaginatedResult<TResult, TCursor>, TCursor>
+			>(finalQueryKey, (prev) =>
+				prev
+					? {
+							...prev,
+							pages: prev.pages.map((page, index) =>
+								index === 0 ? nextFirstPage : page
+							),
+						}
+					: prev
+			);
+		},
+		[finalQueryKey, queryClient]
+	);
+	const deps = useMemo(() => [argsKey], [argsKey]);
 
-		if (!enabled || !hasWebsocket) {
-			return undefined;
-		}
+	const websocket = useRealtimeSubscription({
+		handler,
+		args,
+		realtime,
+		finalQueryKey,
+		deps,
+		applyIncoming: handleIncomingPage,
+	});
 
-		const socket = handler.websocket!(args, {
-			...realtimeOptions,
-			onData: (data, message) => {
-				realtimeOptions.onData?.(data, message);
-				if (realtimeOptions.replaceData === false) return;
-				const nextFirstPage = Array.isArray(data) ? data[0] : undefined;
-				if (!nextFirstPage) return;
-				queryClient.setQueryData<
-					InfiniteData<PaginatedResult<TResult, TCursor>, TCursor>
-				>(finalQueryKey, (prev) =>
-					prev
-						? {
-								...prev,
-								pages: prev.pages.map((page, index) =>
-									index === 0 ? nextFirstPage : page
-								),
-							}
-						: prev
-				);
-			},
-			onMessage: (
-				message: RealtimeMessage<PaginatedResult<TResult, TCursor>>,
-				raw: any
-			) => {
-				realtimeOptions.onMessage?.(message, raw);
-				if (
-					realtimeOptions.replaceData === false ||
-					!message ||
-					message.type !== "data" ||
-					!Array.isArray((message as any).data)
-				) {
-					return;
-				}
-				const nextFirstPage = (message as any).data[0] as
-					| PaginatedResult<TResult, TCursor>
-					| undefined;
-				if (!nextFirstPage) return;
-				queryClient.setQueryData<
-					InfiniteData<PaginatedResult<TResult, TCursor>, TCursor>
-				>(finalQueryKey, (prev) =>
-					prev
-						? {
-								...prev,
-								pages: prev.pages.map((page, index) =>
-									index === 0 ? nextFirstPage : page
-								),
-							}
-						: prev
-				);
-			},
-		});
-
-		websocketRef.current = socket;
-
-		return () => {
-			try {
-				socket.close(1000, "cleanup");
-			} catch {
-				// ignore
-			}
-		};
-	}, [argsKey, finalQueryKey, handler, queryClient, realtime]);
-
-	return { ...infiniteQuery, websocket: websocketRef.current };
+	return { ...infiniteQuery, websocket };
 }
 
 function mergeArgsWithPageParam<TArgs, TPageParam>(
@@ -242,12 +210,4 @@ function mergeArgsWithPageParam<TArgs, TPageParam>(
 		return { [pageParamKey]: pageParam } as unknown as TArgs;
 	}
 	return args as TArgs;
-}
-
-function stableSerialize(value: unknown): string {
-	try {
-		return JSON.stringify(value) ?? "";
-	} catch {
-		return String(value);
-	}
 }

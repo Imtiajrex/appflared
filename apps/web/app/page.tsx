@@ -1,11 +1,8 @@
 "use client";
 
-import QuerySection from "./components/QuerySection";
-import CreateSection from "./components/CreateSection";
-import UpdateSection from "./components/UpdateSection";
-import DeleteSection from "./components/DeleteSection";
 import { createAppflareApi } from "appflare-config/_generated/src/api";
-import { useQuery, useMutation } from "appflare/react/index";
+import { useMutation } from "appflare/react/useMutation";
+import { useQuery } from "appflare/react/useQuery";
 
 const api = createAppflareApi({
 	baseUrl: "http://localhost:8787",
@@ -14,7 +11,6 @@ const api = createAppflareApi({
 	},
 });
 export default function Page() {
-	const schema = api.queries.user.getUsers.schema;
 	const result = useQuery(api.queries.user.getUsers, {
 		realtime: {
 			enabled: true,
