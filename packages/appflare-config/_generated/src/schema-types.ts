@@ -44,6 +44,7 @@ export interface TableDocMap {
 
 export type Doc<TableName extends TableNames> = TableDocMap[TableName];
 
+
 type Keys<T> = keyof T;
 
 type NonNil<T> = Exclude<T, null | undefined>;
@@ -97,38 +98,158 @@ export type QuerySort<TableName extends TableNames> =
 	| Record<string, SortDirection>
 	| Array<[string, SortDirection]>;
 
-export interface DatabaseQuery<
-	TableName extends TableNames,
-	TResultDoc = TableDocMap[TableName],
-> {
-	where(filter: QueryWhere<TableName>): DatabaseQuery<TableName, TResultDoc>;
-	sort(sort: QuerySort<TableName>): DatabaseQuery<TableName, TResultDoc>;
-	limit(limit: number): DatabaseQuery<TableName, TResultDoc>;
-	offset(offset: number): DatabaseQuery<TableName, TResultDoc>;
+type SelectedKeys<TDoc, TSelect> =
+	TSelect extends readonly (infer TKey)[]
+		? Extract<TKey, Keys<TDoc>>
+		: TSelect extends Record<infer TKey, boolean>
+			? Extract<TKey, Keys<TDoc>>
+			: Keys<TDoc>;
 
-	select<const TKeys extends readonly Keys<TResultDoc>[]>(
-		keys: TKeys
-	): DatabaseQuery<TableName, WithSelected<TResultDoc, TKeys[number]>>;
-	select<const TKeys extends readonly Keys<TResultDoc>[]>(
-		...keys: TKeys
-	): DatabaseQuery<TableName, WithSelected<TResultDoc, TKeys[number]>>;
+type IncludedKeys<TDoc, TInclude> =
+	TInclude extends readonly (infer TKey)[]
+		? Extract<TKey, PopulatableKeys<TDoc>>
+		: TInclude extends Record<infer TKey, boolean>
+			? Extract<TKey, PopulatableKeys<TDoc>>
+			: never;
 
-	populate<const TKey extends PopulatableKeys<TResultDoc>>(
-		key: TKey
-	): DatabaseQuery<TableName, WithPopulated<TResultDoc, TKey>>;
-	populate<const TKeys extends readonly PopulatableKeys<TResultDoc>[]>(
-		keys: TKeys
-	): DatabaseQuery<TableName, WithPopulatedMany<TResultDoc, TKeys[number]>>;
+export type PrismaSelect<TDoc> =
+	| ReadonlyArray<Keys<TDoc>>
+	| Partial<Record<Keys<TDoc>, boolean>>;
 
-	find(): Promise<Array<TResultDoc>>;
-	findOne(): Promise<TResultDoc | null>;
-}
+export type PrismaInclude<TDoc> =
+	| ReadonlyArray<PopulatableKeys<TDoc>>
+	| Partial<Record<PopulatableKeys<TDoc>, boolean>>;
 
-export interface DatabaseReader {
-	query<TableName extends TableNames>(
-		table: TableName
-	): DatabaseQuery<TableName, TableDocMap[TableName]>;
-}
+type PrismaResultDoc<TDoc, TSelect, TInclude> = WithSelected<
+	WithPopulatedMany<TDoc, IncludedKeys<TDoc, TInclude>>,
+	SelectedKeys<TDoc, TSelect>
+>;
+
+export type PrismaFindManyArgs<TableName extends TableNames> = {
+	where?: QueryWhere<TableName>;
+	orderBy?: QuerySort<TableName>;
+	skip?: number;
+	take?: number;
+	select?: PrismaSelect<TableDocMap[TableName]>;
+	include?: PrismaInclude<TableDocMap[TableName]>;
+};
+
+export type PrismaFindFirstArgs<TableName extends TableNames> =
+	PrismaFindManyArgs<TableName>;
+
+export type PrismaFindUniqueArgs<TableName extends TableNames> = Omit<
+	PrismaFindManyArgs<TableName>,
+	"skip" | "take" | "orderBy"
+> & {
+	where: Id<TableName> | QueryWhere<TableName>;
+};
+
+export type PrismaCreateArgs<TableName extends TableNames> = {
+	data: EditableDoc<TableName>;
+	select?: PrismaSelect<TableDocMap[TableName]>;
+	include?: PrismaInclude<TableDocMap[TableName]>;
+};
+
+export type PrismaUpdateArgs<TableName extends TableNames> = {
+	where: Id<TableName> | QueryWhere<TableName>;
+	data: Partial<EditableDoc<TableName>>;
+	select?: PrismaSelect<TableDocMap[TableName]>;
+	include?: PrismaInclude<TableDocMap[TableName]>;
+};
+
+export type PrismaDeleteArgs<TableName extends TableNames> = {
+	where: Id<TableName> | QueryWhere<TableName>;
+	select?: PrismaSelect<TableDocMap[TableName]>;
+	include?: PrismaInclude<TableDocMap[TableName]>;
+};
+
+export type PrismaUpdateManyArgs<TableName extends TableNames> = {
+	where?: QueryWhere<TableName>;
+	data: Partial<EditableDoc<TableName>>;
+};
+
+export type PrismaDeleteManyArgs<TableName extends TableNames> = {
+	where?: QueryWhere<TableName>;
+};
+
+export type PrismaCountArgs<TableName extends TableNames> = {
+	where?: QueryWhere<TableName>;
+};
+
+export type PrismaTableClient<TableName extends TableNames> = {
+	findMany<TSelect = PrismaSelect<TableDocMap[TableName]>, TInclude = never>(
+		args?: PrismaFindManyArgs<TableName> & {
+			select?: TSelect;
+			include?: TInclude;
+		}
+	): Promise<
+		Array<PrismaResultDoc<TableDocMap[TableName], TSelect, TInclude>>
+	>;
+	findFirst<
+		TSelect = PrismaSelect<TableDocMap[TableName]>,
+		TInclude = never,
+	>(
+		args?: PrismaFindFirstArgs<TableName> & {
+			select?: TSelect;
+			include?: TInclude;
+		}
+	): Promise<
+		PrismaResultDoc<TableDocMap[TableName], TSelect, TInclude> | null
+	>;
+	findUnique<
+		TSelect = PrismaSelect<TableDocMap[TableName]>,
+		TInclude = never,
+	>(
+		args: PrismaFindUniqueArgs<TableName> & {
+			select?: TSelect;
+			include?: TInclude;
+		}
+	): Promise<
+		PrismaResultDoc<TableDocMap[TableName], TSelect, TInclude> | null
+	>;
+	create<
+		TSelect = PrismaSelect<TableDocMap[TableName]>,
+		TInclude = never,
+	>(
+		args: PrismaCreateArgs<TableName> & {
+			select?: TSelect;
+			include?: TInclude;
+		}
+	): Promise<
+		PrismaResultDoc<TableDocMap[TableName], TSelect, TInclude>
+	>;
+	update<
+		TSelect = PrismaSelect<TableDocMap[TableName]>,
+		TInclude = never,
+	>(
+		args: PrismaUpdateArgs<TableName> & {
+			select?: TSelect;
+			include?: TInclude;
+		}
+	): Promise<
+		PrismaResultDoc<TableDocMap[TableName], TSelect, TInclude> | null
+	>;
+	updateMany(args: PrismaUpdateManyArgs<TableName>): Promise<{ count: number }>;
+	delete<
+		TSelect = PrismaSelect<TableDocMap[TableName]>,
+		TInclude = never,
+	>(
+		args: PrismaDeleteArgs<TableName> & {
+			select?: TSelect;
+			include?: TInclude;
+		}
+	): Promise<
+		PrismaResultDoc<TableDocMap[TableName], TSelect, TInclude> | null
+	>;
+	deleteMany(args?: PrismaDeleteManyArgs<TableName>): Promise<{ count: number }>;
+	count(args?: PrismaCountArgs<TableName>): Promise<number>;
+};
+
+export type PrismaModelMap = {
+	[K in TableNames]: PrismaTableClient<K>;
+};
+
+export type DatabaseReader = PrismaModelMap;
 
 export interface QueryContext {
 	db: DatabaseReader;
@@ -157,26 +278,7 @@ export type EditableDoc<TableName extends TableNames> = Omit<
 	"_id" | "_creationTime"
 >;
 
-export interface DatabaseWriter extends DatabaseReader {
-	insert<TableName extends TableNames>(
-		table: TableName,
-		value: EditableDoc<TableName>
-	): Promise<Id<TableName>>;
-	update<TableName extends TableNames>(
-		table: TableName,
-		where: Id<TableName> | QueryWhere<TableName>,
-		partial: Partial<EditableDoc<TableName>>
-	): Promise<void>;
-	patch<TableName extends TableNames>(
-		table: TableName,
-		where: Id<TableName> | QueryWhere<TableName>,
-		partial: Partial<EditableDoc<TableName>>
-	): Promise<void>;
-	delete<TableName extends TableNames>(
-		table: TableName,
-		where: Id<TableName> | QueryWhere<TableName>
-	): Promise<void>;
-}
+export interface DatabaseWriter extends DatabaseReader {}
 
 export interface MutationContext {
 	db: DatabaseWriter;
@@ -193,6 +295,7 @@ export interface MutationDefinition<TArgs extends QueryArgsShape, TResult> {
 export const mutation = <TArgs extends QueryArgsShape, TResult>(
 	definition: MutationDefinition<TArgs, TResult>
 ): MutationDefinition<TArgs, TResult> => definition;
+
 
 export const tableIndexes = {
 	roombas: [],

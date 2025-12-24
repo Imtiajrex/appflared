@@ -6,9 +6,10 @@ export const getRoombas = query({
 		id: z.string().optional(),
 	},
 	handler: async (ctx, args) => {
-		const Roombas = await ctx.db.query("roombas").populate("owner").find();
-
-		return Roombas;
+		return ctx.db.roombas.findMany({
+			where: args.id ? { _id: args.id } : undefined,
+			include: { owner: true },
+		});
 	},
 });
 
@@ -18,28 +19,28 @@ export const createRoomba = mutation({
 		owner: z.string(),
 	},
 	handler: async (ctx, args) => {
-		const owner = await ctx.db
-			.query("users")
-			.where({ _id: args.owner })
-			.findOne();
+		const owner = await ctx.db.users.findUnique({
+			where: { _id: args.owner },
+		});
 
 		if (!owner) {
 			throw new Error("Owner not found for the provided user id");
 		}
 
-		const roombaId = await ctx.db.insert("roombas", {
-			model: args.model,
-			owner: args.owner,
+		const roomba = await ctx.db.roombas.create({
+			data: {
+				model: args.model,
+				owner: args.owner,
+			},
 		});
 
-		await ctx.db
-			.update("users")
-			.where({ _id: args.owner })
-			.set({
-				roombas: Array.from(new Set([...(owner.roombas ?? []), roombaId])),
-			})
-			.exec();
+		await ctx.db.users.update({
+			where: { _id: args.owner },
+			data: {
+				roombas: Array.from(new Set([...(owner.roombas ?? []), roomba?._id])),
+			},
+		});
 
-		return roombaId;
+		return roomba;
 	},
 });

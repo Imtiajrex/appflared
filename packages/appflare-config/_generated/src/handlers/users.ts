@@ -21,12 +21,12 @@ export const findUsers = query({
 		offset: z.number().int().nonnegative().optional(),
 	},
 	handler: async (ctx, args) => {
-		let q = ctx.db.query("users" as any);
-		if (args.where) q = q.where(args.where as any);
-		if (args.sort) q = q.sort(args.sort as any);
-		if (args.offset !== undefined) q = q.offset(args.offset);
-		if (args.limit !== undefined) q = q.limit(args.limit);
-		return q.find();
+		return ctx.db["users" as any].findMany({
+			where: args.where as any,
+			orderBy: args.sort as any,
+			skip: args.offset,
+			take: args.limit,
+		});
 	},
 });
 
@@ -37,11 +37,12 @@ export const findOneUsers = query({
 		offset: z.number().int().nonnegative().optional(),
 	},
 	handler: async (ctx, args) => {
-		let q = ctx.db.query("users" as any);
-		if (args.where) q = q.where(args.where as any);
-		if (args.sort) q = q.sort(args.sort as any);
-		if (args.offset !== undefined) q = q.offset(args.offset);
-		return q.findOne();
+		return ctx.db["users" as any].findFirst({
+			where: args.where as any,
+			orderBy: args.sort as any,
+			skip: args.offset,
+			take: 1,
+		});
 	},
 });
 
@@ -50,7 +51,9 @@ export const insertUsers = mutation({
 		value: z.custom<EditableDoc<"users">>(),
 	},
 	handler: async (ctx, args) => {
-		return ctx.db.insert("users" as any, args.value as any);
+		return ctx.db["users" as any].create({
+			data: args.value as any,
+		});
 	},
 });
 
@@ -65,19 +68,10 @@ export const updateUsers = mutation({
 		if (!filter) {
 			throw new Error("update requires either args.where or args.id");
 		}
-		if (typeof (ctx.db as any).update === "function") {
-			await (ctx.db as any).update(
-				"users" as any,
-				filter,
-				args.partial as any
-			);
-			return;
-		}
-		await ctx.db.patch(
-			"users" as any,
-			filter,
-			args.partial as any
-		);
+		await ctx.db["users" as any].update({
+			where: filter,
+			data: args.partial as any,
+		});
 	},
 });
 
@@ -91,6 +85,8 @@ export const deleteUsers = mutation({
 		if (!filter) {
 			throw new Error("delete requires either args.where or args.id");
 		}
-		await ctx.db.delete("users" as any, filter);
+		await ctx.db["users" as any].delete({
+			where: filter,
+		});
 	},
 });

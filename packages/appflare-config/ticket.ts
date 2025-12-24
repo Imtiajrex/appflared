@@ -6,14 +6,10 @@ export const getTickets = query({
 		id: z.string().optional(),
 	},
 	handler: async (ctx, args) => {
-		const tickets = await ctx.db
-			.query("tickets")
-			.populate("roombas")
-			.populate("user")
-			.where({})
-			.find();
-
-		return tickets;
+		return ctx.db.tickets.findMany({
+			where: args.id ? { _id: args.id } : undefined,
+			include: { roombas: true, user: true },
+		});
 	},
 });
 
@@ -26,29 +22,32 @@ export const createTicket = mutation({
 	handler: async (ctx, args) => {
 		const roombas = args.roombas ?? [];
 		const user = args.user
-			? await ctx.db.query("users").where({ _id: args.user }).findOne()
+			? await ctx.db.users.findUnique({
+					where: { _id: args.user },
+				})
 			: null;
 
 		if (args.user && !user) {
 			throw new Error("User not found for the provided id");
 		}
 
-		const ticketId = await ctx.db.insert("tickets", {
-			body: args.body,
-			roombas,
-			user: args.user || null,
+		const ticket = await ctx.db.tickets.create({
+			data: {
+				body: args.body,
+				roombas,
+				user: args.user || null,
+			},
 		});
 
 		if (user) {
-			await ctx.db
-				.update("users")
-				.where({ _id: user._id })
-				.set({
-					tickets: Array.from(new Set([...(user.tickets ?? []), ticketId])),
-				})
-				.exec();
+			await ctx.db.users.update({
+				where: { _id: user._id },
+				data: {
+					tickets: [...(user.tickets ?? []), ticket?._id],
+				},
+			});
 		}
 
-		return ticketId;
+		return ticket;
 	},
 });

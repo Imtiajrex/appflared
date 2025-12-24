@@ -113,12 +113,12 @@ export const ${findFn} = query({
 		offset: z.number().int().nonnegative().optional(),
 	},
 	handler: async (ctx, args) => {
-		let q = ctx.db.query(${JSON.stringify(tableName)} as any);
-		if (args.where) q = q.where(args.where as any);
-		if (args.sort) q = q.sort(args.sort as any);
-		if (args.offset !== undefined) q = q.offset(args.offset);
-		if (args.limit !== undefined) q = q.limit(args.limit);
-		return q.find();
+		return ctx.db[${JSON.stringify(tableName)} as any].findMany({
+			where: args.where as any,
+			orderBy: args.sort as any,
+			skip: args.offset,
+			take: args.limit,
+		});
 	},
 });
 
@@ -129,11 +129,12 @@ export const ${findOneFn} = query({
 		offset: z.number().int().nonnegative().optional(),
 	},
 	handler: async (ctx, args) => {
-		let q = ctx.db.query(${JSON.stringify(tableName)} as any);
-		if (args.where) q = q.where(args.where as any);
-		if (args.sort) q = q.sort(args.sort as any);
-		if (args.offset !== undefined) q = q.offset(args.offset);
-		return q.findOne();
+		return ctx.db[${JSON.stringify(tableName)} as any].findFirst({
+			where: args.where as any,
+			orderBy: args.sort as any,
+			skip: args.offset,
+			take: 1,
+		});
 	},
 });
 
@@ -142,7 +143,9 @@ export const ${insertFn} = mutation({
 		value: z.custom<EditableDoc<${JSON.stringify(tableName)}>>(),
 	},
 	handler: async (ctx, args) => {
-		return ctx.db.insert(${JSON.stringify(tableName)} as any, args.value as any);
+		return ctx.db[${JSON.stringify(tableName)} as any].create({
+			data: args.value as any,
+		});
 	},
 });
 
@@ -157,19 +160,10 @@ export const ${updateFn} = mutation({
 		if (!filter) {
 			throw new Error("update requires either args.where or args.id");
 		}
-		if (typeof (ctx.db as any).update === "function") {
-			await (ctx.db as any).update(
-				${JSON.stringify(tableName)} as any,
-				filter,
-				args.partial as any
-			);
-			return;
-		}
-		await ctx.db.patch(
-			${JSON.stringify(tableName)} as any,
-			filter,
-			args.partial as any
-		);
+		await ctx.db[${JSON.stringify(tableName)} as any].update({
+			where: filter,
+			data: args.partial as any,
+		});
 	},
 });
 
@@ -183,7 +177,9 @@ export const ${deleteFn} = mutation({
 		if (!filter) {
 			throw new Error("delete requires either args.where or args.id");
 		}
-		await ctx.db.delete(${JSON.stringify(tableName)} as any, filter);
+		await ctx.db[${JSON.stringify(tableName)} as any].delete({
+			where: filter,
+		});
 	},
 });
 `;

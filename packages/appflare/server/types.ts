@@ -14,6 +14,48 @@ export type EditableDoc<TDoc extends TableDocBase> = Omit<
 	"_id" | "_creationTime"
 >;
 
+export type SelectedKeys<TDoc, TSelect> =
+	TSelect extends readonly (infer TKey)[]
+		? Extract<TKey, Keys<TDoc>>
+		: TSelect extends Record<infer TKey, boolean>
+			? Extract<TKey, Keys<TDoc>>
+			: Keys<TDoc>;
+
+export type IncludedKeys<
+	TDoc,
+	TInclude,
+	TTableDocMap extends Record<string, TableDocBase>,
+> = TInclude extends readonly (infer TKey)[]
+	? Extract<TKey, PopulatableKeys<TDoc, TTableDocMap>>
+	: TInclude extends Record<infer TKey, boolean>
+		? Extract<TKey, PopulatableKeys<TDoc, TTableDocMap>>
+		: never;
+
+export type PrismaSelect<TDoc> =
+	| ReadonlyArray<Keys<TDoc>>
+	| Partial<Record<Keys<TDoc>, boolean>>;
+
+export type PrismaInclude<
+	TDoc,
+	TTableDocMap extends Record<string, TableDocBase>,
+> =
+	| ReadonlyArray<PopulatableKeys<TDoc, TTableDocMap>>
+	| Partial<Record<PopulatableKeys<TDoc, TTableDocMap>, boolean>>;
+
+export type PrismaResultDoc<
+	TDoc,
+	TSelect,
+	TInclude,
+	TTableDocMap extends Record<string, TableDocBase>,
+> = WithSelected<
+	WithPopulatedMany<
+		TDoc,
+		IncludedKeys<TDoc, TInclude, TTableDocMap>,
+		TTableDocMap
+	>,
+	SelectedKeys<TDoc, TSelect>
+>;
+
 export type SortDirection = "asc" | "desc";
 
 export type QuerySort<TKey extends string> =
@@ -155,7 +197,7 @@ export type MongoDbPatchBuilder<
 	TTableDocMap extends Record<string, TableDocBase>,
 > = MongoDbUpdateBuilder<TableName, TTableDocMap>;
 
-export type MongoDbContext<
+export type MongoDbCoreContext<
 	TTableNames extends string,
 	TTableDocMap extends Record<TTableNames, TableDocBase>,
 > = {
@@ -190,6 +232,170 @@ export type MongoDbContext<
 		where: Id<TableName> | QueryWhere<TTableDocMap[TableName]>
 	): Promise<void>;
 };
+
+export type PrismaFindManyArgs<
+	TableName extends string,
+	TTableDocMap extends Record<TableName, TableDocBase>,
+> = {
+	where?: QueryWhere<TTableDocMap[TableName]>;
+	orderBy?: QuerySort<keyof TTableDocMap[TableName] & string>;
+	skip?: number;
+	take?: number;
+	select?: PrismaSelect<TTableDocMap[TableName]>;
+	include?: PrismaInclude<TTableDocMap[TableName], TTableDocMap>;
+};
+
+export type PrismaFindFirstArgs<
+	TableName extends string,
+	TTableDocMap extends Record<TableName, TableDocBase>,
+> = PrismaFindManyArgs<TableName, TTableDocMap>;
+
+export type PrismaFindUniqueArgs<
+	TableName extends string,
+	TTableDocMap extends Record<TableName, TableDocBase>,
+> = Omit<
+	PrismaFindManyArgs<TableName, TTableDocMap>,
+	"skip" | "take" | "orderBy"
+> & {
+	where: Id<TableName> | QueryWhere<TTableDocMap[TableName]>;
+};
+
+export type PrismaCreateArgs<
+	TableName extends string,
+	TTableDocMap extends Record<TableName, TableDocBase>,
+> = {
+	data: EditableDoc<TTableDocMap[TableName]>;
+	select?: PrismaSelect<TTableDocMap[TableName]>;
+	include?: PrismaInclude<TTableDocMap[TableName], TTableDocMap>;
+};
+
+export type PrismaUpdateArgs<
+	TableName extends string,
+	TTableDocMap extends Record<TableName, TableDocBase>,
+> = {
+	where: Id<TableName> | QueryWhere<TTableDocMap[TableName]>;
+	data: Partial<EditableDoc<TTableDocMap[TableName]>>;
+	select?: PrismaSelect<TTableDocMap[TableName]>;
+	include?: PrismaInclude<TTableDocMap[TableName], TTableDocMap>;
+};
+
+export type PrismaDeleteArgs<
+	TableName extends string,
+	TTableDocMap extends Record<TableName, TableDocBase>,
+> = {
+	where: Id<TableName> | QueryWhere<TTableDocMap[TableName]>;
+	select?: PrismaSelect<TTableDocMap[TableName]>;
+	include?: PrismaInclude<TTableDocMap[TableName], TTableDocMap>;
+};
+
+export type PrismaUpdateManyArgs<
+	TableName extends string,
+	TTableDocMap extends Record<TableName, TableDocBase>,
+> = {
+	where?: QueryWhere<TTableDocMap[TableName]>;
+	data: Partial<EditableDoc<TTableDocMap[TableName]>>;
+};
+
+export type PrismaDeleteManyArgs<
+	TableName extends string,
+	TTableDocMap extends Record<TableName, TableDocBase>,
+> = {
+	where?: QueryWhere<TTableDocMap[TableName]>;
+};
+
+export type PrismaCountArgs<
+	TableName extends string,
+	TTableDocMap extends Record<TableName, TableDocBase>,
+> = {
+	where?: QueryWhere<TTableDocMap[TableName]>;
+};
+
+export type PrismaTableClient<
+	TableName extends string,
+	TTableDocMap extends Record<TableName, TableDocBase>,
+> = {
+	findMany<TSelect = PrismaSelect<TTableDocMap[TableName]>, TInclude = never>(
+		args?: PrismaFindManyArgs<TableName, TTableDocMap> & {
+			select?: TSelect;
+			include?: TInclude;
+		}
+	): Promise<
+		Array<
+			PrismaResultDoc<TTableDocMap[TableName], TSelect, TInclude, TTableDocMap>
+		>
+	>;
+	findFirst<TSelect = PrismaSelect<TTableDocMap[TableName]>, TInclude = never>(
+		args?: PrismaFindFirstArgs<TableName, TTableDocMap> & {
+			select?: TSelect;
+			include?: TInclude;
+		}
+	): Promise<PrismaResultDoc<
+		TTableDocMap[TableName],
+		TSelect,
+		TInclude,
+		TTableDocMap
+	> | null>;
+	findUnique<TSelect = PrismaSelect<TTableDocMap[TableName]>, TInclude = never>(
+		args: PrismaFindUniqueArgs<TableName, TTableDocMap> & {
+			select?: TSelect;
+			include?: TInclude;
+		}
+	): Promise<PrismaResultDoc<
+		TTableDocMap[TableName],
+		TSelect,
+		TInclude,
+		TTableDocMap
+	> | null>;
+	create<TSelect = PrismaSelect<TTableDocMap[TableName]>, TInclude = never>(
+		args: PrismaCreateArgs<TableName, TTableDocMap> & {
+			select?: TSelect;
+			include?: TInclude;
+		}
+	): Promise<
+		PrismaResultDoc<TTableDocMap[TableName], TSelect, TInclude, TTableDocMap>
+	>;
+	update<TSelect = PrismaSelect<TTableDocMap[TableName]>, TInclude = never>(
+		args: PrismaUpdateArgs<TableName, TTableDocMap> & {
+			select?: TSelect;
+			include?: TInclude;
+		}
+	): Promise<PrismaResultDoc<
+		TTableDocMap[TableName],
+		TSelect,
+		TInclude,
+		TTableDocMap
+	> | null>;
+	updateMany(
+		args: PrismaUpdateManyArgs<TableName, TTableDocMap>
+	): Promise<{ count: number }>;
+	delete<TSelect = PrismaSelect<TTableDocMap[TableName]>, TInclude = never>(
+		args: PrismaDeleteArgs<TableName, TTableDocMap> & {
+			select?: TSelect;
+			include?: TInclude;
+		}
+	): Promise<PrismaResultDoc<
+		TTableDocMap[TableName],
+		TSelect,
+		TInclude,
+		TTableDocMap
+	> | null>;
+	deleteMany(
+		args?: PrismaDeleteManyArgs<TableName, TTableDocMap>
+	): Promise<{ count: number }>;
+	count(args?: PrismaCountArgs<TableName, TTableDocMap>): Promise<number>;
+};
+
+export type PrismaModelMap<
+	TTableNames extends string,
+	TTableDocMap extends Record<TTableNames, TableDocBase>,
+> = {
+	[K in TTableNames]: PrismaTableClient<K, TTableDocMap>;
+};
+
+export type MongoDbContext<
+	TTableNames extends string,
+	TTableDocMap extends Record<TTableNames, TableDocBase>,
+> = PrismaModelMap<TTableNames, TTableDocMap>;
 
 export type CreateMongoDbContextOptions<TTableNames extends string> = {
 	db: Db;

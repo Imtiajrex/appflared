@@ -5,13 +5,10 @@ export const getUsers = query({
 		id: z.string().optional(),
 	},
 	handler: async (ctx, args) => {
-		const users = ctx.db
-			.query("users")
-			.populate("roombas")
-			.populate("tickets")
-			.find();
-
-		return users;
+		return ctx.db.users.findMany({
+			where: args.id ? { _id: args.id } : undefined,
+			include: { roombas: true, tickets: true },
+		});
 	},
 });
 
@@ -20,10 +17,12 @@ export const createUser = mutation({
 		name: z.string(),
 	},
 	handler: async (ctx, args) => {
-		const User = await ctx.db.insert("users", {
-			name: args.name,
-			roombas: [],
-			tickets: [],
+		const User = await ctx.db.users.create({
+			data: {
+				name: args.name,
+				roombas: [],
+				tickets: [],
+			},
 		});
 
 		return User;
@@ -35,12 +34,9 @@ export const deleteUser = mutation({
 		id: z.string().optional(),
 	},
 	handler: async (ctx, args) => {
-		await ctx.db
-			.delete("users")
-			.where({
-				_id: args.id,
-			})
-			.exec();
+		await ctx.db.users.delete({
+			where: { _id: args.id },
+		});
 
 		return {
 			success: true,
@@ -55,15 +51,12 @@ export const updateUser = mutation({
 		name: z.string().optional(),
 	},
 	handler: async (ctx, args) => {
-		await ctx.db
-			.update("users")
-			.where({
-				_id: args.id,
-			})
-			.set({
+		await ctx.db.users.update({
+			where: { _id: args.id },
+			data: {
 				name: args.name,
-			})
-			.exec();
+			},
+		});
 
 		return {
 			success: true,
