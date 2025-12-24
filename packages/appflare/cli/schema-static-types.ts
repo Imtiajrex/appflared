@@ -66,144 +66,144 @@ type IncludedKeys<TDoc, TInclude> =
 			? Extract<TKey, PopulatableKeys<TDoc>>
 			: never;
 
-export type PrismaSelect<TDoc> =
+export type AppflareSelect<TDoc> =
 	| ReadonlyArray<Keys<TDoc>>
 	| Partial<Record<Keys<TDoc>, boolean>>;
 
-export type PrismaInclude<TDoc> =
+export type AppflareInclude<TDoc> =
 	| ReadonlyArray<PopulatableKeys<TDoc>>
 	| Partial<Record<PopulatableKeys<TDoc>, boolean>>;
 
-type PrismaResultDoc<TDoc, TSelect, TInclude> = WithSelected<
+type AppflareResultDoc<TDoc, TSelect, TInclude> = WithSelected<
 	WithPopulatedMany<TDoc, IncludedKeys<TDoc, TInclude>>,
 	SelectedKeys<TDoc, TSelect>
 >;
 
-export type PrismaFindManyArgs<TableName extends TableNames> = {
+export type AppflareFindManyArgs<TableName extends TableNames> = {
 	where?: QueryWhere<TableName>;
 	orderBy?: QuerySort<TableName>;
 	skip?: number;
 	take?: number;
-	select?: PrismaSelect<TableDocMap[TableName]>;
-	include?: PrismaInclude<TableDocMap[TableName]>;
+	select?: AppflareSelect<TableDocMap[TableName]>;
+	include?: AppflareInclude<TableDocMap[TableName]>;
 };
 
-export type PrismaFindFirstArgs<TableName extends TableNames> =
-	PrismaFindManyArgs<TableName>;
+export type AppflareFindFirstArgs<TableName extends TableNames> =
+	AppflareFindManyArgs<TableName>;
 
-export type PrismaFindUniqueArgs<TableName extends TableNames> = Omit<
-	PrismaFindManyArgs<TableName>,
+export type AppflareFindUniqueArgs<TableName extends TableNames> = Omit<
+	AppflareFindManyArgs<TableName>,
 	"skip" | "take" | "orderBy"
 > & {
 	where: Id<TableName> | QueryWhere<TableName>;
 };
 
-export type PrismaCreateArgs<TableName extends TableNames> = {
+export type AppflareCreateArgs<TableName extends TableNames> = {
 	data: EditableDoc<TableName>;
-	select?: PrismaSelect<TableDocMap[TableName]>;
-	include?: PrismaInclude<TableDocMap[TableName]>;
+	select?: AppflareSelect<TableDocMap[TableName]>;
+	include?: AppflareInclude<TableDocMap[TableName]>;
 };
 
-export type PrismaUpdateArgs<TableName extends TableNames> = {
+export type AppflareUpdateArgs<TableName extends TableNames> = {
 	where: Id<TableName> | QueryWhere<TableName>;
 	data: Partial<EditableDoc<TableName>>;
-	select?: PrismaSelect<TableDocMap[TableName]>;
-	include?: PrismaInclude<TableDocMap[TableName]>;
+	select?: AppflareSelect<TableDocMap[TableName]>;
+	include?: AppflareInclude<TableDocMap[TableName]>;
 };
 
-export type PrismaDeleteArgs<TableName extends TableNames> = {
+export type AppflareDeleteArgs<TableName extends TableNames> = {
 	where: Id<TableName> | QueryWhere<TableName>;
-	select?: PrismaSelect<TableDocMap[TableName]>;
-	include?: PrismaInclude<TableDocMap[TableName]>;
+	select?: AppflareSelect<TableDocMap[TableName]>;
+	include?: AppflareInclude<TableDocMap[TableName]>;
 };
 
-export type PrismaUpdateManyArgs<TableName extends TableNames> = {
+export type AppflareUpdateManyArgs<TableName extends TableNames> = {
 	where?: QueryWhere<TableName>;
 	data: Partial<EditableDoc<TableName>>;
 };
 
-export type PrismaDeleteManyArgs<TableName extends TableNames> = {
+export type AppflareDeleteManyArgs<TableName extends TableNames> = {
 	where?: QueryWhere<TableName>;
 };
 
-export type PrismaCountArgs<TableName extends TableNames> = {
+export type AppflareCountArgs<TableName extends TableNames> = {
 	where?: QueryWhere<TableName>;
 };
 
-export type PrismaTableClient<TableName extends TableNames> = {
-	findMany<TSelect = PrismaSelect<TableDocMap[TableName]>, TInclude = never>(
-		args?: PrismaFindManyArgs<TableName> & {
+export type AppflareTableClient<TableName extends TableNames> = {
+	findMany<TSelect = AppflareSelect<TableDocMap[TableName]>, TInclude = never>(
+		args?: AppflareFindManyArgs<TableName> & {
 			select?: TSelect;
 			include?: TInclude;
 		}
 	): Promise<
-		Array<PrismaResultDoc<TableDocMap[TableName], TSelect, TInclude>>
+		Array<AppflareResultDoc<TableDocMap[TableName], TSelect, TInclude>>
 	>;
 	findFirst<
-		TSelect = PrismaSelect<TableDocMap[TableName]>,
+		TSelect = AppflareSelect<TableDocMap[TableName]>,
 		TInclude = never,
 	>(
-		args?: PrismaFindFirstArgs<TableName> & {
+		args?: AppflareFindFirstArgs<TableName> & {
 			select?: TSelect;
 			include?: TInclude;
 		}
 	): Promise<
-		PrismaResultDoc<TableDocMap[TableName], TSelect, TInclude> | null
+		AppflareResultDoc<TableDocMap[TableName], TSelect, TInclude> | null
 	>;
 	findUnique<
-		TSelect = PrismaSelect<TableDocMap[TableName]>,
+		TSelect = AppflareSelect<TableDocMap[TableName]>,
 		TInclude = never,
 	>(
-		args: PrismaFindUniqueArgs<TableName> & {
+		args: AppflareFindUniqueArgs<TableName> & {
 			select?: TSelect;
 			include?: TInclude;
 		}
 	): Promise<
-		PrismaResultDoc<TableDocMap[TableName], TSelect, TInclude> | null
+		AppflareResultDoc<TableDocMap[TableName], TSelect, TInclude> | null
 	>;
 	create<
-		TSelect = PrismaSelect<TableDocMap[TableName]>,
+		TSelect = AppflareSelect<TableDocMap[TableName]>,
 		TInclude = never,
 	>(
-		args: PrismaCreateArgs<TableName> & {
+		args: AppflareCreateArgs<TableName> & {
 			select?: TSelect;
 			include?: TInclude;
 		}
 	): Promise<
-		PrismaResultDoc<TableDocMap[TableName], TSelect, TInclude>
+		AppflareResultDoc<TableDocMap[TableName], TSelect, TInclude>
 	>;
 	update<
-		TSelect = PrismaSelect<TableDocMap[TableName]>,
+		TSelect = AppflareSelect<TableDocMap[TableName]>,
 		TInclude = never,
 	>(
-		args: PrismaUpdateArgs<TableName> & {
+		args: AppflareUpdateArgs<TableName> & {
 			select?: TSelect;
 			include?: TInclude;
 		}
 	): Promise<
-		PrismaResultDoc<TableDocMap[TableName], TSelect, TInclude> | null
+		AppflareResultDoc<TableDocMap[TableName], TSelect, TInclude> | null
 	>;
-	updateMany(args: PrismaUpdateManyArgs<TableName>): Promise<{ count: number }>;
+	updateMany(args: AppflareUpdateManyArgs<TableName>): Promise<{ count: number }>;
 	delete<
-		TSelect = PrismaSelect<TableDocMap[TableName]>,
+		TSelect = AppflareSelect<TableDocMap[TableName]>,
 		TInclude = never,
 	>(
-		args: PrismaDeleteArgs<TableName> & {
+		args: AppflareDeleteArgs<TableName> & {
 			select?: TSelect;
 			include?: TInclude;
 		}
 	): Promise<
-		PrismaResultDoc<TableDocMap[TableName], TSelect, TInclude> | null
+		AppflareResultDoc<TableDocMap[TableName], TSelect, TInclude> | null
 	>;
-	deleteMany(args?: PrismaDeleteManyArgs<TableName>): Promise<{ count: number }>;
-	count(args?: PrismaCountArgs<TableName>): Promise<number>;
+	deleteMany(args?: AppflareDeleteManyArgs<TableName>): Promise<{ count: number }>;
+	count(args?: AppflareCountArgs<TableName>): Promise<number>;
 };
 
-export type PrismaModelMap = {
-	[K in TableNames]: PrismaTableClient<K>;
+export type AppflareModelMap = {
+	[K in TableNames]: AppflareTableClient<K>;
 };
 
-export type DatabaseReader = PrismaModelMap;
+export type DatabaseReader = AppflareModelMap;
 
 export interface QueryContext {
 	db: DatabaseReader;

@@ -18,7 +18,7 @@ import type {
 	MongoDbCoreContext,
 	MongoDbContext,
 	MongoDbQuery,
-	PrismaTableClient,
+	AppflareTableClient,
 	TableDocBase,
 } from "./types";
 
@@ -123,7 +123,7 @@ export function createMongoDbContext<
 	const ctx = {} as MongoDbContext<TTableNames, TTableDocMap>;
 
 	for (const table of tableNames) {
-		(ctx as any)[table] = createPrismaTableClient({
+		(ctx as any)[table] = createAppflareTableClient({
 			table: table as TTableNames,
 			core,
 			refs,
@@ -145,7 +145,7 @@ function toKeyList(arg: unknown): string[] | undefined {
 	return undefined;
 }
 
-function createPrismaTableClient<
+function createAppflareTableClient<
 	TTableNames extends string,
 	TTableDocMap extends Record<TTableNames, TableDocBase>,
 	TableName extends TTableNames,
@@ -154,7 +154,7 @@ function createPrismaTableClient<
 	core: MongoDbCoreContext<TTableNames, TTableDocMap>;
 	refs: ReturnType<typeof buildSchemaRefMap>;
 	getCollection: (table: string) => Collection<Document>;
-}): PrismaTableClient<TableName, TTableDocMap> {
+}): AppflareTableClient<TableName, TTableDocMap> {
 	const selectKeys = (select: unknown) => toKeyList(select);
 	const includeKeys = (include: unknown) => toKeyList(include);
 
