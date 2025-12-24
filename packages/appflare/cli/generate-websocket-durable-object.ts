@@ -136,9 +136,9 @@ export class WebSocketHibernationServer extends DurableObject {
 	}
 
 	private parseSubscription(params: URLSearchParams): ParsedSubscription {
-		const table = params.get("table") as TableNames | null;
+		const table = this.normalizeTableName(params.get("table"));
 		if (!table) {
-			return { ok: false, error: "Missing required table param" };
+			return { ok: false, error: "Missing or invalid table param" };
 		}
 
 		const parseJson = <T>(key: string): T | undefined => {
@@ -284,6 +284,9 @@ export class WebSocketHibernationServer extends DurableObject {
 	private async fetchData(sub: Subscription): Promise<unknown[]> {
 		const db = this.getDb();
 		const table = db[sub.table] as any;
+		if (!table || typeof table.findMany !== "function") {
+			throw new Error(\`Unknown table: \${sub.table}\`);
+		}
 		const data = await table.findMany({
 			where: sub.where as any,
 			orderBy: sub.orderBy as any,
@@ -311,6 +314,15 @@ export class WebSocketHibernationServer extends DurableObject {
 			take: sub.take ?? null,
 			skip: sub.skip ?? null,
 		});
+	}
+
+	private normalizeTableName(table: string | null): TableNames | null {
+		if (!table) return null;
+		const schemaTables = schema as Record<string, unknown>;
+		if (schemaTables[table]) return table as TableNames;
+		const plural = \`\${table}s\`;
+		if (schemaTables[plural]) return plural as TableNames;
+		return null;
 	}
 }
 `;

@@ -148,7 +148,7 @@ export function useQuery<TArgs, TResult, TError = unknown>(
 				// ignore
 			}
 		};
-	}, [args, finalQueryKey, handler, queryClient, realtime]);
+	}, [argsKey, finalQueryKey, handler, queryClient, realtime]);
 
 	return { ...query, websocket: websocketRef.current };
 }

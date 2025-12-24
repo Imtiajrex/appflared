@@ -224,7 +224,7 @@ export function usePaginatedQuery<
 				// ignore
 			}
 		};
-	}, [args, finalQueryKey, handler, queryClient, realtime]);
+	}, [argsKey, finalQueryKey, handler, queryClient, realtime]);
 
 	return { ...infiniteQuery, websocket: websocketRef.current };
 }

@@ -4,7 +4,6 @@ import {
 	isValidIdentifier,
 	pascalCase,
 	toImportPathFromGeneratedSrc,
-	toImportPathFromGeneratedServer,
 } from "./utils";
 
 export function generateApiClient(params: {
@@ -41,6 +40,9 @@ export function generateApiClient(params: {
 
 	const handlerTypePrefix = (h: DiscoveredHandler): string =>
 		pascalCase(`${h.fileName}-${h.name}`);
+
+	const normalizeTableName = (fileName: string): string =>
+		fileName.endsWith("s") ? fileName : `${fileName}s`;
 
 	const typeBlocks: string[] = [];
 	for (const h of params.handlers) {
@@ -108,7 +110,7 @@ export function generateApiClient(params: {
 						`\t\t\t},\n` +
 						`\t\t\t{\n` +
 						`\t\t\t\tschema: createHandlerSchema(${handlerAccessor}.args),\n` +
-						`\t\t\t\twebsocket: createHandlerWebsocket<${pascal}Args, ${pascal}Result>(realtime, { defaultTable: ${JSON.stringify(fileName)} }),\n` +
+						`\t\t\t\twebsocket: createHandlerWebsocket<${pascal}Args, ${pascal}Result>(realtime, { defaultTable: ${JSON.stringify(normalizeTableName(fileName))} }),\n` +
 						`\t\t\t\tpath: ${JSON.stringify(route)},\n` +
 						`\t\t\t}\n` +
 						`\t\t),`
@@ -144,7 +146,7 @@ export function generateApiClient(params: {
 						`\t\t\t},\n` +
 						`\t\t\t{\n` +
 						`\t\t\t\tschema: createHandlerSchema(${handlerAccessor}.args),\n` +
-						`\t\t\t\twebsocket: createHandlerWebsocket<${pascal}Args, ${pascal}Result>(realtime, { defaultTable: ${JSON.stringify(fileName)} }),\n` +
+						`\t\t\t\twebsocket: createHandlerWebsocket<${pascal}Args, ${pascal}Result>(realtime, { defaultTable: ${JSON.stringify(normalizeTableName(fileName))} }),\n` +
 						`\t\t\t\tpath: ${JSON.stringify(route)},\n` +
 						`\t\t\t}\n` +
 						`\t\t),`
@@ -335,7 +337,11 @@ function createHandlerWebsocket<TArgs, TResult>(
 			);
 		}
 		const params = new URLSearchParams();
-		params.set("table", options?.table ?? defaults.defaultTable);
+		const tableParam = options?.table ?? defaults.defaultTable;
+		const normalizedTable = tableParam.endsWith("s")
+			? tableParam
+			: tableParam + "s";
+		params.set("table", normalizedTable);
 		const where = options?.where ?? (isPlainObject(args) ? (args as Record<string, unknown>) : undefined);
 		if (where && Object.keys(where).length > 0) {
 			params.set("where", JSON.stringify(where));
@@ -406,7 +412,7 @@ function buildRealtimeUrl(
 	const normalizedBase = baseUrl.replace(/\\/+$/, "");
 	const normalizedPath = path.startsWith("/") ? path : "/" + path;
 	const query = params.toString();
-	return query ? \`\${normalizedBase}\${normalizedPath}?\${query}\` : \`\${normalizedBase}\${normalizedPath}\`;
+	return query ? normalizedBase + normalizedPath + "?" + query : normalizedBase + normalizedPath;
 }
 
 function buildQueryUrl(

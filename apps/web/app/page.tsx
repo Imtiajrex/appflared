@@ -36,8 +36,8 @@ export default function Page() {
 						backgroundColor: "#1b1b1bff",
 					}}
 				>
-					{data._id} - {data.name} - {data.tickets.length} tickets -{" "}
-					{data.roombas.length} roombas
+					{data._id} - {data.name} - {data.tickets?.length} tickets -{" "}
+					{data.roombas?.length} roombas
 				</div>
 			))}
 			<form
