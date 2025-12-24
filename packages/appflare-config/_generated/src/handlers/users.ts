@@ -56,21 +56,26 @@ export const insertUsers = mutation({
 
 export const updateUsers = mutation({
 	args: {
-		id: z.custom<Id<"users">>(),
+		id: z.custom<Id<"users">>().optional(),
+		where: z.custom<QueryWhere<"users">>().optional(),
 		partial: z.custom<Partial<EditableDoc<"users">>>(),
 	},
 	handler: async (ctx, args) => {
+		const filter = (args.where ?? args.id) as any;
+		if (!filter) {
+			throw new Error("update requires either args.where or args.id");
+		}
 		if (typeof (ctx.db as any).update === "function") {
 			await (ctx.db as any).update(
 				"users" as any,
-				args.id as any,
+				filter,
 				args.partial as any
 			);
 			return;
 		}
 		await ctx.db.patch(
 			"users" as any,
-			args.id as any,
+			filter,
 			args.partial as any
 		);
 	},
@@ -78,9 +83,14 @@ export const updateUsers = mutation({
 
 export const deleteUsers = mutation({
 	args: {
-		id: z.custom<Id<"users">>(),
+		id: z.custom<Id<"users">>().optional(),
+		where: z.custom<QueryWhere<"users">>().optional(),
 	},
 	handler: async (ctx, args) => {
-		await ctx.db.delete("users" as any, args.id as any);
+		const filter = (args.where ?? args.id) as any;
+		if (!filter) {
+			throw new Error("delete requires either args.where or args.id");
+		}
+		await ctx.db.delete("users" as any, filter);
 	},
 });

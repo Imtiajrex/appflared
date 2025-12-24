@@ -1,16 +1,14 @@
+import { createAppflareHonoServer } from 'appflare-config/_generated/server/server';
 import { MONGO_DURABLE_OBJECT } from 'cloudflare-do-mongo/do';
 import { getDatabase } from 'cloudflare-do-mongo/index';
-import { createAppflareHonoServer } from 'appflare-config/_generated/server/server';
-import { WebSocketHibernationServer } from './websocket-hibernation-server';
 import { Db } from 'mongodb';
-import { env } from 'cloudflare:workers';
-
-const app = createAppflareHonoServer({
-	db: getDatabase(env.MONGO_DB) as any as Db,
-});
+import { WebSocketHibernationServer } from './websocket-hibernation-server';
 
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
+		const app = createAppflareHonoServer({
+			db: getDatabase(env.MONGO_DB) as any as Db,
+		});
 		const upgradeHeader = request.headers.get('Upgrade');
 		if (upgradeHeader === 'websocket') {
 			const url = new URL(request.url);

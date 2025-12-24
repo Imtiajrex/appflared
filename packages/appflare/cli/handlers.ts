@@ -148,21 +148,26 @@ export const ${insertFn} = mutation({
 
 export const ${updateFn} = mutation({
 	args: {
-		id: z.custom<Id<${JSON.stringify(tableName)}>>(),
+		id: z.custom<Id<${JSON.stringify(tableName)}>>().optional(),
+		where: z.custom<QueryWhere<${JSON.stringify(tableName)}>>().optional(),
 		partial: z.custom<Partial<EditableDoc<${JSON.stringify(tableName)}>>>(),
 	},
 	handler: async (ctx, args) => {
+		const filter = (args.where ?? args.id) as any;
+		if (!filter) {
+			throw new Error("update requires either args.where or args.id");
+		}
 		if (typeof (ctx.db as any).update === "function") {
 			await (ctx.db as any).update(
 				${JSON.stringify(tableName)} as any,
-				args.id as any,
+				filter,
 				args.partial as any
 			);
 			return;
 		}
 		await ctx.db.patch(
 			${JSON.stringify(tableName)} as any,
-			args.id as any,
+			filter,
 			args.partial as any
 		);
 	},
@@ -170,10 +175,15 @@ export const ${updateFn} = mutation({
 
 export const ${deleteFn} = mutation({
 	args: {
-		id: z.custom<Id<${JSON.stringify(tableName)}>>(),
+		id: z.custom<Id<${JSON.stringify(tableName)}>>().optional(),
+		where: z.custom<QueryWhere<${JSON.stringify(tableName)}>>().optional(),
 	},
 	handler: async (ctx, args) => {
-		await ctx.db.delete(${JSON.stringify(tableName)} as any, args.id as any);
+		const filter = (args.where ?? args.id) as any;
+		if (!filter) {
+			throw new Error("delete requires either args.where or args.id");
+		}
+		await ctx.db.delete(${JSON.stringify(tableName)} as any, filter);
 	},
 });
 `;

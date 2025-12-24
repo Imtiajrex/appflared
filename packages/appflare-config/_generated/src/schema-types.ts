@@ -32,7 +32,8 @@ export interface UsersDoc {
 	_id: Id<"users">;
 	_creationTime: number;
 	name: string;
-	tickets: Array<Id<"tickets">>;
+	tickets?: Array<Id<"tickets">>;
+	roombas?: Array<Id<"roombas">>;
 }
 
 export interface TableDocMap {
@@ -163,17 +164,17 @@ export interface DatabaseWriter extends DatabaseReader {
 	): Promise<Id<TableName>>;
 	update<TableName extends TableNames>(
 		table: TableName,
-		id: Id<TableName>,
+		where: Id<TableName> | QueryWhere<TableName>,
 		partial: Partial<EditableDoc<TableName>>
 	): Promise<void>;
 	patch<TableName extends TableNames>(
 		table: TableName,
-		id: Id<TableName>,
+		where: Id<TableName> | QueryWhere<TableName>,
 		partial: Partial<EditableDoc<TableName>>
 	): Promise<void>;
 	delete<TableName extends TableNames>(
 		table: TableName,
-		id: Id<TableName>
+		where: Id<TableName> | QueryWhere<TableName>
 	): Promise<void>;
 }
 

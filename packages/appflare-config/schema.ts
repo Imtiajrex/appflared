@@ -9,7 +9,8 @@ export default defineSchema({
 	}),
 	users: defineTable({
 		name: v.string(),
-		tickets: v.array(v.id("tickets")),
+		tickets: v.array(v.id("tickets")).optional(),
+		roombas: v.array(v.id("roombas")).optional(),
 	}),
 	roombas: defineTable({
 		model: v.string(),
