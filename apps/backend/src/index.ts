@@ -8,6 +8,19 @@ export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		const app = createAppflareHonoServer({
 			db: getDatabase(env.MONGO_DB) as any as Db,
+			realtime: {
+				durableObject: env.WEBSOCKET_HIBERNATION_SERVER,
+				durableObjectName: 'primary',
+				notify: async (payload) => {
+					const id = env.WEBSOCKET_HIBERNATION_SERVER.idFromName('primary');
+					const stub = env.WEBSOCKET_HIBERNATION_SERVER.get(id);
+					await stub.fetch('http://appflare-realtime/notify', {
+						method: 'POST',
+						headers: { 'content-type': 'application/json' },
+						body: JSON.stringify(payload),
+					});
+				},
+			},
 		});
 		const upgradeHeader = request.headers.get('Upgrade');
 		if (upgradeHeader === 'websocket') {

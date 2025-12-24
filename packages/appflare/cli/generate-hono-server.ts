@@ -65,7 +65,7 @@ export function generateHonoServer(params: {
 				`\t\tif (notifyMutation) {\n` +
 				`\t\t\ttry {\n` +
 				`\t\t\t\tawait notifyMutation({\n` +
-				`\t\t\t\t\t table: ${JSON.stringify(m.fileName)},\n` +
+				`\t\t\t\t\t table: normalizeTableName(${JSON.stringify(m.fileName)}),\n` +
 				`\t\t\t\t\t handler: { file: ${JSON.stringify(m.fileName)}, name: ${JSON.stringify(m.name)} },\n` +
 				`\t\t\t\t\t args: body,\n` +
 				`\t\t\t\t\t result,\n` +
@@ -139,6 +139,14 @@ export type AppflareHonoServerOptions = {
 	corsOrigin?: string | string[];
 	realtime?: RealtimeOptions;
 };
+
+function normalizeTableName(table: string): TableNames {
+	const tables = schema as Record<string, unknown>;
+	if (tables[table]) return table as TableNames;
+	const plural = \`\${table}s\`;
+	if (tables[plural]) return plural as TableNames;
+	throw new Error(\`Unknown table: \${table}\`);
+}
 
 export function createAppflareHonoServer(options: AppflareHonoServerOptions): Hono {
 	const fixedDb =
