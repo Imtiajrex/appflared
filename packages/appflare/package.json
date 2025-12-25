@@ -6,6 +6,9 @@
 		"appflare": "./cli.ts"
 	},
 	"exports": {
+		".": "./index.ts",
+		"./db": "./lib/db.ts",
+		"./values": "./lib/values.ts",
 		"./*": "./*.ts",
 		"./react/*": "./react/*.ts",
 		"./react": "./react/index.ts",

@@ -1,3 +1,3 @@
-export * from "./useMutation";
-export * from "./usePaginatedQuery";
-export * from "./useQuery";
+export * from "./hooks/useMutation";
+export * from "./hooks/usePaginatedQuery";
+export * from "./hooks/useQuery";

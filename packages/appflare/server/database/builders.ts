@@ -1,10 +1,10 @@
 import type { Collection, Document } from "mongodb";
-import { isIdValue, normalizeIdFilter, toMongoFilter } from "./id-utils";
+import { isIdValue, normalizeIdFilter, toMongoFilter } from "../utils/id-utils";
 import type {
 	MongoDbDeleteBuilder,
 	MongoDbPatchBuilder,
 	MongoDbUpdateBuilder,
-} from "./types";
+} from "../types/types";
 
 export function createDeleteBuilder(params: {
 	table: string;

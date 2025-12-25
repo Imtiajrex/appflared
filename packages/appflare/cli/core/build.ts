@@ -1,8 +1,12 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { AppflareConfig, assertDirExists, assertFileExists } from "./utils";
-import { getSchemaTableNames, generateSchemaTypes } from "./schema";
+import {
+	AppflareConfig,
+	assertDirExists,
+	assertFileExists,
+} from "../utils/utils";
+import { getSchemaTableNames, generateSchemaTypes } from "../schema/schema";
 import {
 	generateDbHandlers,
 	discoverHandlers,

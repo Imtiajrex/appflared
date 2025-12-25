@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { AppflareConfig, assertFileExists } from "./utils";
+import { AppflareConfig, assertFileExists } from "../utils/utils";
 
 export async function loadConfig(
 	configPathAbs: string

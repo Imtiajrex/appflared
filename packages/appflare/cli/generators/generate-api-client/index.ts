@@ -3,7 +3,7 @@ import {
 	groupBy,
 	pascalCase,
 	toImportPathFromGeneratedSrc,
-} from "../utils";
+} from "../../utils/utils";
 import {
 	generateMutationsClientLines,
 	generateQueriesClientLines,

@@ -1,6 +1,6 @@
 import type { Document, Filter } from "mongodb";
 import { ObjectId } from "mongodb";
-import type { Id, QueryWhere, SchemaRefMap } from "./types";
+import type { Id, QueryWhere, SchemaRefMap } from "../types/types";
 
 export function isIdValue(value: unknown): value is string {
 	return typeof value === "string";

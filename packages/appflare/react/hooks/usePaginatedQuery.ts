@@ -14,7 +14,7 @@ import {
 	buildQueryKey,
 	stableSerialize,
 	useRealtimeSubscription,
-} from "./queryShared";
+} from "../shared/queryShared";
 
 export type PaginatedResult<TResult, TCursor = unknown> = {
 	items: TResult[];

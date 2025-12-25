@@ -14,7 +14,7 @@ import {
 	buildQueryKey,
 	stableSerialize,
 	useRealtimeSubscription,
-} from "./queryShared";
+} from "../shared/queryShared";
 
 export type UseAppflareQueryOptions<TArgs, TResult, TError = unknown> = {
 	handler: HandlerWithRealtime<TArgs, TResult>;
@@ -103,4 +103,4 @@ export {
 	HandlerWebsocketOptions,
 	HandlerWithRealtime,
 	RealtimeHookOptions,
-} from "./queryShared";
+} from "../shared/queryShared";

@@ -10,10 +10,10 @@ import {
 	generateDbHandlers,
 	generateHonoServer,
 	generateWebsocketDurableObject,
-} from "./core/handlers";
-import { generateSchemaTypes, getSchemaTableNames } from "./schema/schema";
-import { runTscEmit, writeEmitTsconfig } from "./utils/tsc";
-import { assertDirExists, assertFileExists } from "./utils/utils";
+} from "./handlers";
+import { generateSchemaTypes, getSchemaTableNames } from "../schema/schema";
+import { runTscEmit, writeEmitTsconfig } from "../utils/tsc";
+import { assertDirExists, assertFileExists } from "../utils/utils";
 
 type AppflareConfig = {
 	dir: string;

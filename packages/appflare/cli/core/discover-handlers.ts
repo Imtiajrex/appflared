@@ -1,6 +1,11 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { DiscoveredHandler, HandlerKind, walkTsFiles, groupBy } from "./utils";
+import {
+	DiscoveredHandler,
+	HandlerKind,
+	walkTsFiles,
+	groupBy,
+} from "../utils/utils";
 
 export async function discoverHandlers(params: {
 	projectDirAbs: string;

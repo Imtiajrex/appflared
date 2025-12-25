@@ -3,7 +3,7 @@ import {
 	groupBy,
 	pascalCase,
 	toImportPathFromGeneratedServer,
-} from "./utils";
+} from "../utils/utils";
 
 export function generateWebsocketDurableObject(params: {
 	handlers: DiscoveredHandler[];

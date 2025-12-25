@@ -11,8 +11,8 @@ import {
 	normalizeIdFilter,
 	normalizeRefFields,
 	toMongoFilter,
-} from "./id-utils";
-import { buildSchemaRefMap } from "./schema-refs";
+} from "../utils/id-utils";
+import { buildSchemaRefMap } from "../types/schema-refs";
 import type {
 	CreateMongoDbContextOptions,
 	MongoDbCoreContext,
@@ -20,7 +20,7 @@ import type {
 	MongoDbQuery,
 	AppflareTableClient,
 	TableDocBase,
-} from "./types";
+} from "../types/types";
 
 export function createMongoDbContext<
 	TTableNames extends string,

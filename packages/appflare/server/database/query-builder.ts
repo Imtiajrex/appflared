@@ -1,7 +1,7 @@
 import type { Collection, Document, Filter, FindOptions, Sort } from "mongodb";
 import { applyPopulate } from "./populate";
-import { normalizeIdFilter, stringifyIdField } from "./id-utils";
-import type { MongoDbQuery, SchemaRefMap } from "./types";
+import { normalizeIdFilter, stringifyIdField } from "../utils/id-utils";
+import type { MongoDbQuery, SchemaRefMap } from "../types/types";
 import { buildProjection, normalizeSort } from "./query-utils";
 
 export function createQueryBuilder<

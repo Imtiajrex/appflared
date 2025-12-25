@@ -1,7 +1,7 @@
 import type { Collection, Document } from "mongodb";
 import { ObjectId } from "mongodb";
-import { normalizeIdValue, stringifyIdField } from "./id-utils";
-import type { SchemaRefMap } from "./types";
+import { normalizeIdValue, stringifyIdField } from "../utils/id-utils";
+import type { SchemaRefMap } from "../types/types";
 
 export async function applyPopulate(params: {
 	docs: Array<Record<string, unknown>>;

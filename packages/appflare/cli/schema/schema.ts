@@ -1,7 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { staticTypeDefinitions } from "./schema-static-types";
-import { pascalCase } from "./utils";
-import { getZodObjectShape, renderField } from "./zod-utils";
+import { pascalCase } from "../utils/utils";
+import { getZodObjectShape, renderField } from "../utils/zod-utils";
 
 function generateDocParts(
 	tableNames: string[],

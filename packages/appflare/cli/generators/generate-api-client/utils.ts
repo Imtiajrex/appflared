@@ -1,4 +1,4 @@
-import { isValidIdentifier } from "../utils";
+import { isValidIdentifier } from "../../utils/utils";
 
 export const sortedEntries = <T>(map: Map<string, T[]>): Array<[string, T[]]> =>
 	Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));

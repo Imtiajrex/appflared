@@ -1,4 +1,4 @@
-import { DiscoveredHandler } from "../utils";
+import { DiscoveredHandler } from "../../utils/utils";
 import { handlerTypePrefix, renderObjectKey, sortedEntries } from "./utils";
 
 export function generateTypeBlocks(

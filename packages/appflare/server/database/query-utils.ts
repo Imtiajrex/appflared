@@ -1,5 +1,5 @@
 import type { Sort } from "mongodb";
-import type { QuerySort } from "./types";
+import type { QuerySort } from "../types/types";
 
 export function buildProjection(keys: string[]): Record<string, 0 | 1> {
 	const projection: Record<string, 0 | 1> = {};
