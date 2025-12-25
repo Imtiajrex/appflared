@@ -2,15 +2,23 @@ import type { Document, Filter } from "mongodb";
 import { ObjectId } from "mongodb";
 import type { Id, QueryWhere, SchemaRefMap } from "../types/types";
 
-export function isIdValue(value: unknown): value is string {
-	return typeof value === "string";
+export function isIdValue(value: unknown): value is string | ObjectId {
+	return typeof value === "string" || value instanceof ObjectId;
+}
+
+function ensureObjectId(value: string | ObjectId): ObjectId {
+	if (value instanceof ObjectId) return value;
+	if (!ObjectId.isValid(value)) {
+		throw new Error("Invalid id format; expected a 24-char hex ObjectId");
+	}
+	return new ObjectId(value);
 }
 
 export function toMongoFilter(
 	where: Id<any> | QueryWhere<any>
 ): Filter<Document> {
 	if (isIdValue(where)) {
-		return { _id: where as any } satisfies Filter<Document> as any;
+		return { _id: ensureObjectId(where) } satisfies Filter<Document> as any;
 	}
 	if (where && typeof where === "object") {
 		return where as Filter<Document>;

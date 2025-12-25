@@ -1,10 +1,6 @@
 import type { Collection, Document } from "mongodb";
 import { ObjectId } from "mongodb";
-import {
-	createDeleteBuilder,
-	createPatchBuilder,
-	createUpdateBuilder,
-} from "./builders";
+import { createPatchBuilder, createUpdateBuilder } from "./builders";
 import { createQueryBuilder } from "./query-builder";
 import {
 	isIdValue,
@@ -67,14 +63,6 @@ export function createMongoDbContext<
 			return objectId.toHexString() as any;
 		},
 		update: ((table: any, where?: any, partial?: any) => {
-			if (arguments.length === 1) {
-				return createUpdateBuilder({
-					table,
-					getCollection,
-					normalizePartial: (p) =>
-						normalizeRefFields(table as string, p as any, refs),
-				});
-			}
 			const coll = getCollection(table as string);
 			const filter = normalizeIdFilter(toMongoFilter(where));
 			const update = {
@@ -86,14 +74,6 @@ export function createMongoDbContext<
 			return coll.updateMany(filter, update).then(() => {});
 		}) as any,
 		patch: ((table: any, where?: any, partial?: any) => {
-			if (arguments.length === 1) {
-				return createPatchBuilder({
-					table,
-					getCollection,
-					normalizePartial: (p) =>
-						normalizeRefFields(table as string, p as any, refs),
-				});
-			}
 			const coll = getCollection(table as string);
 			const filter = normalizeIdFilter(toMongoFilter(where));
 			const update = {
@@ -105,12 +85,6 @@ export function createMongoDbContext<
 			return coll.updateMany(filter, update).then(() => {});
 		}) as any,
 		delete: ((table: any, where?: any) => {
-			if (arguments.length === 1) {
-				return createDeleteBuilder({
-					table,
-					getCollection,
-				});
-			}
 			const coll = getCollection(table as string);
 			const filter = normalizeIdFilter(toMongoFilter(where));
 			if (isIdValue(where)) {

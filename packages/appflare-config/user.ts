@@ -3,12 +3,12 @@ import { mutation, query } from "./_generated/src/schema-types";
 export const getUsers = query({
 	args: {
 		id: z.string().optional(),
-		name: z.string(),
+		name: z.string().optional(),
 	},
 	handler: async (ctx, args) => {
-		const where: Record<string, string | undefined> = { name: args.name };
+		const where: Record<string, string | undefined> = {};
+		if (args.name) where.name = args.name;
 		if (args.id) where._id = args.id;
-		console.log("args", args);
 
 		return ctx.db.users.findMany({
 			where,
@@ -36,7 +36,7 @@ export const createUser = mutation({
 
 export const deleteUser = mutation({
 	args: {
-		id: z.string().optional(),
+		id: z.string(),
 	},
 	handler: async (ctx, args) => {
 		await ctx.db.users.delete({
@@ -52,11 +52,10 @@ export const deleteUser = mutation({
 
 export const updateUser = mutation({
 	args: {
-		id: z.string().optional(),
+		id: z.string(),
 		name: z.string().optional(),
 	},
 	handler: async (ctx, args) => {
-		console.log("Updating user with args:", args);
 		await ctx.db.users.update({
 			where: { _id: args.id },
 			data: {
