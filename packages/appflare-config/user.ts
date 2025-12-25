@@ -10,13 +10,20 @@ export const getUsers = query({
 		if (args.name) where.name = args.name;
 		if (args.id) where._id = args.id;
 
-		return ctx.db.users.findMany({
+		const users = ctx.db.users.findMany({
 			where,
 			include: { roombas: true, tickets: true },
 		});
+
+		return users;
 	},
 });
-
+export const getUserData = query({
+	args: {},
+	handler: async (ctx, args) => {
+		return ctx.user;
+	},
+});
 export const createUser = mutation({
 	args: {
 		name: z.string(),

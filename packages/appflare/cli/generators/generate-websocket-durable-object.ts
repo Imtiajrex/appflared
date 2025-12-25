@@ -498,7 +498,11 @@ export class WebSocketHibernationServer extends DurableObject {
 	}
 
 	private createHandlerContext(): AppflareServerContext {
-		return { db: this.getDb() } as AppflareServerContext;
+		return {
+			db: this.getDb(),
+			session: null,
+			user: null,
+		} as AppflareServerContext;
 	}
 
 	private getDb(): AppflareDbContext {

@@ -205,7 +205,7 @@ export type AppflareModelMap = {
 
 export type DatabaseReader = AppflareModelMap;
 
-export interface QueryContext {
+export interface QueryContext extends AppflareAuthContext {
 	db: DatabaseReader;
 }
 
@@ -234,7 +234,7 @@ export type EditableDoc<TableName extends TableNames> = Omit<
 
 export interface DatabaseWriter extends DatabaseReader {}
 
-export interface MutationContext {
+export interface MutationContext extends AppflareAuthContext {
 	db: DatabaseWriter;
 }
 

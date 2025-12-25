@@ -46,17 +46,84 @@ export function generateHonoServer(params: {
 	const authImports = params.config.auth
 		? [
 				`import appflareConfig from ${JSON.stringify(configImportPath)};`,
-				`import { createBetterAuthRouter, initBetterAuth } from "appflare/server/auth";`,
+				`import { createBetterAuthRouter, getSanitizedRequest, initBetterAuth } from "appflare/server/auth";`,
 			].join("\n")
 		: "";
 
 	const authSetup = params.config.auth
-		? `const __appflareAuthConfig = (appflareConfig as any).auth;\nconst __appflareAuthBasePath = __appflareAuthConfig?.basePath ?? "/auth";\nconst __appflareAuthRouter = __appflareAuthConfig && __appflareAuthConfig.enabled !== false && __appflareAuthConfig.options\n\t? createBetterAuthRouter({\n\t\tauth: initBetterAuth(__appflareAuthConfig.options as any),\n\t})\n\t: undefined;`
+		? [
+				`const __appflareAuthConfig = (appflareConfig as any).auth;`,
+				`const __appflareAuthBasePath = __appflareAuthConfig?.basePath ?? "/auth";`,
+				`const __appflareAuth =`,
+				`\t__appflareAuthConfig &&`,
+				`\t__appflareAuthConfig.enabled !== false &&`,
+				`\t__appflareAuthConfig.options`,
+				`\t\t? initBetterAuth(__appflareAuthConfig.options as any)`,
+				`\t\t: undefined;`,
+				`const __appflareAuthRouter = __appflareAuth`,
+				`\t? createBetterAuthRouter({`,
+				`\t\tauth: __appflareAuth,`,
+				`\t})`,
+				`\t: undefined;`,
+			].join("\n")
 		: "";
 
 	const authMount = params.config.auth
 		? `\n\tif (__appflareAuthRouter) {\n\t\tapp.route(__appflareAuthBasePath, __appflareAuthRouter);\n\t}\n`
 		: "";
+
+	const authResolver = params.config.auth
+		? [
+				`const resolveAuthContext = async (`,
+				`\tc: HonoContext`,
+				`): Promise<AppflareAuthContext> => {`,
+				`\tif (!__appflareAuth) {`,
+				`\t\tconst authContext: AppflareAuthContext = {`,
+				`\t\t\tsession: null as AppflareAuthSession,`,
+				`\t\t\tuser: null as AppflareAuthUser,`,
+				`\t\t};`,
+				`\t\tc.set("appflareSession", authContext.session);`,
+				`\t\tc.set("appflareUser", authContext.user);`,
+				`\t\treturn authContext;`,
+				`\t}`,
+				``,
+				`\tconst sessionResult = await __appflareAuth.api.getSession(`,
+				`\t\c.req.raw`,
+				`\t);`,
+				`\tconst authContext: AppflareAuthContext = {`,
+				`\t\tsession:`,
+				`\t\t\t(sessionResult as any)?.session ??`,
+				`\t\t\t(sessionResult as any) ??`,
+				`\t\t\t(null as AppflareAuthSession),`,
+				`\t\tuser: (sessionResult as any)?.user ?? (null as AppflareAuthUser),`,
+				`\t};`,
+				`\tc.set("appflareSession", authContext.session);`,
+				`\tc.set("appflareUser", authContext.user);`,
+				`\treturn authContext;`,
+				`};`,
+			].join("\n")
+		: [
+				`const resolveAuthContext = async (`,
+				`\tc: HonoContext`,
+				`): Promise<AppflareAuthContext> => {`,
+				`\tconst authContext: AppflareAuthContext = {`,
+				`\t\tsession: null as AppflareAuthSession,`,
+				`\t\tuser: null as AppflareAuthUser,`,
+				`\t};`,
+				`\tc.set("appflareSession", authContext.session);`,
+				`\tc.set("appflareUser", authContext.user);`,
+				`\treturn authContext;`,
+				`};`,
+			].join("\n");
+
+	const indent = (block: string): string =>
+		block
+			.split("\n")
+			.map((line) => `\t${line}`)
+			.join("\n");
+
+	const authSetupBlock = authSetup ? `\n${indent(authSetup)}\n` : "";
+	const authResolverBlock = `\n${indent(authResolver)}\n`;
 
 	const routeLines: string[] = [];
 	for (const q of queries) {
@@ -67,7 +134,7 @@ export function generateHonoServer(params: {
 				`\tsValidator("query", z.object(${local}.args as any)),\n` +
 				`\tasync (c) => {\n` +
 				`\t\tconst query = c.req.valid("query");\n` +
-				`\t\tconst ctx = await createContext(c);\n` +
+				`\t\tconst ctx = await resolveContext(c);\n` +
 				`\t\tconst result = await ${local}.handler(ctx as any, query as any);\n` +
 				`\t\treturn c.json(result, 200);\n` +
 				`\t}\n` +
@@ -82,7 +149,7 @@ export function generateHonoServer(params: {
 				`\tsValidator("json", z.object(${local}.args as any)),\n` +
 				`\tasync (c) => {\n` +
 				`\t\tconst body = c.req.valid("json");\n` +
-				`\t\tconst ctx = await createContext(c);\n` +
+				`\t\tconst ctx = await resolveContext(c);\n` +
 				`\t\tconst result = await ${local}.handler(ctx as any, body as any);\n` +
 				`\t\tif (notifyMutation) {\n` +
 				`\t\t\ttry {\n` +
@@ -126,13 +193,21 @@ ${authImports}
 		: ""
 }
 
-import type { TableDocMap, TableNames } from "../src/schema-types";
+import type {
+	AppflareAuthContext,
+	AppflareAuthSession,
+	AppflareAuthUser,
+	TableDocMap,
+	TableNames,
+} from "../src/schema-types";
 
 ${importLines.join("\n")}
 
 export type AppflareDbContext = MongoDbContext<TableNames, TableDocMap>;
 
-export type AppflareServerContext = { db: AppflareDbContext };
+export type AppflareServerContext = AppflareAuthContext & {
+	db: AppflareDbContext;
+};
 
 export function createAppflareDbContext(params: {
 	db: import("mongodb").Db;
@@ -173,7 +248,8 @@ export type AppflareHonoServerOptions = {
 	/** Optionally extend the context beyond the db wrapper. */
 	createContext?: (
 		c: HonoContext,
-		db: AppflareDbContext
+		db: AppflareDbContext,
+		auth: AppflareAuthContext
 	) => AppflareServerContext | Promise<AppflareServerContext>;
 	collectionName?: (table: TableNames) => string;
 	corsOrigin?: string | string[];
@@ -183,9 +259,9 @@ export type AppflareHonoServerOptions = {
 function normalizeTableName(table: string): TableNames {
 	const tables = schema as Record<string, unknown>;
 	if (tables[table]) return table as TableNames;
-	const plural = \`\${table}s\`;
+	const plural = table + "s";
 	if (tables[plural]) return plural as TableNames;
-	throw new Error(\`Unknown table: \${table}\`);
+	throw new Error("Unknown table: " + table);
 }
 
 export function createAppflareHonoServer(options: AppflareHonoServerOptions): Hono {
@@ -212,7 +288,8 @@ export function createAppflareHonoServer(options: AppflareHonoServerOptions): Ho
 	};
 
 	const createContext =
-		options.createContext ?? ((_c, db) => ({ db } as AppflareServerContext));
+		options.createContext ??
+		((_c, db, auth) => ({ db, ...auth }) as AppflareServerContext);
 	const notifyMutation = createMutationNotifier(options.realtime);
 	const app = new Hono();
 	app.use(
@@ -220,22 +297,17 @@ export function createAppflareHonoServer(options: AppflareHonoServerOptions): Ho
 			origin: options.corsOrigin ?? "*",
 		})
 	);
-${
-	authSetup
-		? `
-${authSetup}
-`
-		: ""
-}
-${authMount}
-	${routeLines
-		.map((line) =>
-			line.replace(
-				"const ctx = await createContext(c);",
-				"const db = await resolveDb(c);\n\t\tconst ctx = await createContext(c, db);"
-			)
-		)
-		.join("\n\n\t")}
+${authSetupBlock}${authMount}${authResolverBlock}
+	const resolveContext = async (
+		c: HonoContext
+	): Promise<AppflareServerContext> => {
+		const db = await resolveDb(c);
+		const auth = await resolveAuthContext(c);
+		const ctx = await createContext(c, db, auth);
+		return ctx ?? ({ db, ...auth } as AppflareServerContext);
+	};
+
+	${routeLines.join("\n\n\t")}
 
 	return app;
 }

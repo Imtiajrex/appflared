@@ -36,7 +36,11 @@ export async function buildFromConfig(params: {
 	await fs.mkdir(path.join(outDirAbs, "src"), { recursive: true });
 	await fs.mkdir(path.join(outDirAbs, "server"), { recursive: true });
 
-	const schemaTypesTs = await generateSchemaTypes({ schemaPathAbs });
+	const schemaTypesTs = await generateSchemaTypes({
+		schemaPathAbs,
+		configPathAbs,
+		outDirAbs,
+	});
 	await fs.writeFile(
 		path.join(outDirAbs, "src", "schema-types.ts"),
 		schemaTypesTs
