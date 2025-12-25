@@ -133,13 +133,6 @@ ${importLines.join("\n")}
 export type AppflareDbContext = MongoDbContext<TableNames, TableDocMap>;
 
 export type AppflareServerContext = { db: AppflareDbContext };
-${
-	authSetup
-		? `
-${authSetup}
-`
-		: ""
-}
 
 export function createAppflareDbContext(params: {
 	db: import("mongodb").Db;
@@ -227,6 +220,13 @@ export function createAppflareHonoServer(options: AppflareHonoServerOptions): Ho
 			origin: options.corsOrigin ?? "*",
 		})
 	);
+${
+	authSetup
+		? `
+${authSetup}
+`
+		: ""
+}
 ${authMount}
 	${routeLines
 		.map((line) =>
@@ -261,14 +261,5 @@ function createMutationNotifier(
 	return undefined;
 }
 
-const app = createAppflareHonoServer({
-	getDb: () => {
-		throw new Error(
-			"AppflareHonoServer default export requires options.db or options.getDb. Provide one when creating the server."
-		);
-	},
-});
-
-export default app;
 `;
 }

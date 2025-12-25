@@ -1,21 +1,18 @@
-import type { BetterAuthOptions } from 'better-auth';
 import { createAppflareHonoServer } from 'appflare-config/_generated/server/server';
 import { WebSocketHibernationServer } from 'appflare-config/_generated/server/websocket-hibernation-server';
-import { MONGO_DURABLE_OBJECT } from 'cloudflare-do-mongo/do';
-import { getDatabase } from 'cloudflare-do-mongo';
-import { Db } from 'mongodb';
+import appflareConfig from 'appflare-config/appflare.config';
 import { createR2StorageManager } from 'appflare/server/storage';
+import { getDatabase } from 'cloudflare-do-mongo';
+import { MONGO_DURABLE_OBJECT } from 'cloudflare-do-mongo/do';
 import type { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import appflareConfig from 'appflare-config/appflare.config';
-import { createBetterAuthRouter, initBetterAuth } from 'appflare/server/auth';
+import { Db } from 'mongodb';
 
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		type WorkerEnv = { Bindings: Env };
 
 		const authConfig = (appflareConfig as any).auth;
-		const authOptions = authConfig?.options as BetterAuthOptions | undefined;
 		const allowedOrigins = 'http://localhost:3000'
 			.split(',')
 			.map((origin) => origin.trim())
@@ -39,13 +36,6 @@ export default {
 				},
 			},
 		}) as unknown as Hono<WorkerEnv>;
-		const authCors = cors({
-			origin: resolveCorsOrigin,
-			credentials: true,
-			allowMethods: ['GET', 'POST', 'OPTIONS'],
-			allowHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-			exposeHeaders: ['set-cookie'],
-		});
 		app.use(
 			'*',
 			cors({
@@ -70,18 +60,6 @@ export default {
 					Vary: 'Origin',
 				},
 			});
-		}
-		const authRouter =
-			authConfig && authConfig.enabled !== false && authOptions
-				? createBetterAuthRouter<BetterAuthOptions, WorkerEnv>({
-						// initBetterAuth will throw if required options (adapter/providers) are missing
-						auth: initBetterAuth(authOptions),
-					})
-				: undefined;
-		if (authRouter) {
-			const authBasePath = authConfig.basePath ?? '/auth';
-			app.use(`${authBasePath}/*`, authCors);
-			app.route(authBasePath, authRouter);
 		}
 
 		const storageManager = createR2StorageManager<WorkerEnv>({

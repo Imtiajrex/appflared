@@ -1,6 +1,6 @@
 import { betterAuth, type Auth, type BetterAuthOptions } from "better-auth";
-import { Hono } from "hono";
 import type { Context } from "hono";
+import { Hono } from "hono";
 
 export type BetterAuthHandlerOptions<
 	Options extends BetterAuthOptions = BetterAuthOptions,
@@ -16,7 +16,7 @@ export function createBetterAuthHandler<
 >(options: BetterAuthHandlerOptions<Options, Env>) {
 	return async (c: Context<Env>) => {
 		try {
-			return await options.auth.handler(c.req.raw);
+			return await options.auth.handler(getSanitizedRequest(c.req.raw));
 		} catch (error) {
 			if (options.onError) return options.onError(error, c);
 			console.error("BetterAuth handler error", error);
@@ -25,6 +25,9 @@ export function createBetterAuthHandler<
 	};
 }
 
+import { mongodbAdapter } from "better-auth/adapters/mongodb";
+import { getDatabase } from "cloudflare-do-mongo";
+import { env } from "cloudflare:workers";
 export function createBetterAuthRouter<
 	Options extends BetterAuthOptions = BetterAuthOptions,
 	Env = unknown,
@@ -39,5 +42,34 @@ export function createBetterAuthRouter<
 export function initBetterAuth<Options extends BetterAuthOptions>(
 	options: Options
 ): Auth<Options> {
-	return betterAuth(options);
+	return betterAuth({
+		...options,
+		database: mongodbAdapter(getDatabase((env as any).MONGO_DB) as any),
+	});
 }
+
+export const getHeaders = (headers: Headers) => {
+	const newHeaders = Object.fromEntries(headers as any);
+	const headerObject: Record<string, any> = {};
+	for (const key in newHeaders) {
+		const isAuthorization =
+			key.toLowerCase() === "authorization" && newHeaders[key]?.Length > 7;
+		if (isAuthorization) {
+			if (key !== "cookie") {
+				headerObject[key] = newHeaders[key];
+			}
+		} else {
+			if (key !== "authorization") {
+				headerObject[key] = newHeaders[key];
+			}
+		}
+	}
+
+	return headerObject as any as Headers;
+};
+export const getSanitizedRequest = (req: Request) => {
+	const newRequest = new Request(req, {
+		headers: getHeaders(req.headers),
+	});
+	return newRequest;
+};
