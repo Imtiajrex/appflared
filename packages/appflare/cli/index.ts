@@ -11,6 +11,10 @@ import {
 	generateHonoServer,
 	generateWebsocketDurableObject,
 } from "./core/handlers";
+import {
+	generateCloudflareWorkerIndex,
+	generateWranglerJson,
+} from "./generators/generate-cloudflare-worker";
 import { generateSchemaTypes, getSchemaTableNames } from "./schema/schema";
 import { runTscEmit, writeEmitTsconfig } from "./utils/tsc";
 import { assertDirExists, assertFileExists } from "./utils/utils";
@@ -19,6 +23,11 @@ type AppflareConfig = {
 	dir: string;
 	schema: string;
 	outDir: string;
+	corsOrigin?: string | string[];
+	auth?: {
+		enabled?: boolean;
+		basePath?: string;
+	};
 };
 
 const program = new Command();
@@ -155,6 +164,21 @@ async function buildFromConfig(params: {
 		websocketDoTs
 	);
 
+	const allowedOrigins = normalizeAllowedOrigins(
+		process.env.APPFLARE_ALLOWED_ORIGINS ??
+			config.corsOrigin ??
+			"http://localhost:3000"
+	);
+	const workerIndexTs = generateCloudflareWorkerIndex({ allowedOrigins });
+	await fs.writeFile(path.join(outDirAbs, "server", "index.ts"), workerIndexTs);
+
+	const wranglerJson = generateWranglerJson({
+		config,
+		configDirAbs,
+		allowedOrigins,
+	});
+	await fs.writeFile(path.join(outDirAbs, "wrangler.json"), wranglerJson);
+
 	if (emit) {
 		// Remove previous emit output to avoid stale files lingering.
 		await fs.rm(path.join(outDirAbs, "dist"), { recursive: true, force: true });
@@ -167,4 +191,9 @@ async function buildFromConfig(params: {
 		});
 		await runTscEmit(emitTsconfigAbs);
 	}
+}
+
+function normalizeAllowedOrigins(origins: string | string[]): string[] {
+	const list = Array.isArray(origins) ? origins : origins.split(",");
+	return list.map((origin) => origin.trim()).filter(Boolean);
 }

@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { BetterAuthOptions } from "better-auth";
+import type { StorageManagerOptions } from "../../server/storage/types";
 
 export type AppflareAuthConfig<
 	Options extends BetterAuthOptions = BetterAuthOptions,
@@ -10,13 +11,21 @@ export type AppflareAuthConfig<
 	options?: Options;
 };
 
+export type AppflareStorageConfig<
+	Env = unknown,
+	Principal = unknown,
+> = StorageManagerOptions<Env, Principal>;
+
 export type AppflareConfig<
 	Options extends BetterAuthOptions = BetterAuthOptions,
 > = {
 	dir: string;
 	schema: string;
 	outDir: string;
+	/** Optional CORS whitelist for generated Worker entrypoint. */
+	corsOrigin?: string | string[];
 	auth?: AppflareAuthConfig<Options>;
+	storage?: AppflareStorageConfig;
 };
 
 export type HandlerKind = "query" | "mutation";

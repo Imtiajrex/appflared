@@ -23,6 +23,7 @@ export function generateHonoServer(params: {
 		params.outDirAbs,
 		params.configPathAbs
 	);
+	const configImportLine = `import appflareConfig from ${JSON.stringify(configImportPath)};`;
 
 	const localNameFor = (h: DiscoveredHandler): string =>
 		`__appflare_${pascalCase(h.fileName)}_${h.name}`;
@@ -44,10 +45,7 @@ export function generateHonoServer(params: {
 	}
 
 	const authImports = params.config.auth
-		? [
-				`import appflareConfig from ${JSON.stringify(configImportPath)};`,
-				`import { createBetterAuthRouter, getSanitizedRequest, initBetterAuth } from "appflare/server/auth";`,
-			].join("\n")
+		? `import { createBetterAuthRouter, getSanitizedRequest, initBetterAuth } from "appflare/server/auth";`
 		: "";
 
 	const authSetup = params.config.auth
@@ -181,10 +179,15 @@ import { sValidator } from "@hono/standard-validator";
 import { z } from "zod";
 import { cors } from "hono/cors";
 import schema from ${JSON.stringify(schemaImportPath)};
+${configImportLine}
 import {
 	createMongoDbContext,
 	type MongoDbContext,
 } from "appflare/server/db";
+import {
+	createR2StorageManager,
+	type StorageManagerOptions,
+} from "appflare/server/storage";
 ${
 	authImports
 		? `
@@ -240,6 +243,14 @@ type RealtimeOptions = {
 	durableObjectName?: string;
 };
 
+type StorageOptions<Env = unknown, Principal = unknown> =
+	Partial<StorageManagerOptions<Env, Principal>> & {
+		enabled?: boolean;
+		corsOrigin?: string | string[];
+		corsAllowHeaders?: string[];
+		corsAllowMethods?: string[];
+	};
+
 export type AppflareHonoServerOptions = {
 	/** Provide a static Mongo Db instance. If omitted, set getDb instead. */
 	db?: import("mongodb").Db;
@@ -254,6 +265,7 @@ export type AppflareHonoServerOptions = {
 	collectionName?: (table: TableNames) => string;
 	corsOrigin?: string | string[];
 	realtime?: RealtimeOptions;
+	storage?: StorageOptions;
 };
 
 function normalizeTableName(table: string): TableNames {
@@ -262,6 +274,16 @@ function normalizeTableName(table: string): TableNames {
 	const plural = table + "s";
 	if (tables[plural]) return plural as TableNames;
 	throw new Error("Unknown table: " + table);
+}
+
+function normalizeStorageBasePath(basePath?: string): string {
+	if (!basePath) return "/storage";
+	const withLeadingSlash = basePath.startsWith("/")
+		? basePath
+		: "/" + basePath;
+	return withLeadingSlash.endsWith("/")
+		? withLeadingSlash.slice(0, -1) || "/"
+		: withLeadingSlash;
 }
 
 export function createAppflareHonoServer(options: AppflareHonoServerOptions): Hono {
@@ -297,6 +319,49 @@ export function createAppflareHonoServer(options: AppflareHonoServerOptions): Ho
 			origin: options.corsOrigin ?? "*",
 		})
 	);
+
+	const storageOptions = options.storage ?? {};
+	const storageConfig = (appflareConfig as any).storage;
+	const storageRules = storageOptions.rules ?? storageConfig?.rules;
+	const storageEnabled =
+		(storageOptions.enabled ?? true) && !!storageRules && storageRules.length > 0;
+
+	if (storageEnabled) {
+		const storageBasePath = normalizeStorageBasePath(
+			storageOptions.basePath ?? storageConfig?.basePath
+		);
+		const storageManager = createR2StorageManager({
+			basePath: storageBasePath,
+			bucketBinding:
+				storageOptions.bucketBinding ??
+				storageConfig?.bucketBinding ??
+				"APPFLARE_STORAGE",
+			defaultCacheControl:
+				storageOptions.defaultCacheControl ??
+				storageConfig?.defaultCacheControl,
+			getBucket: storageOptions.getBucket ?? storageConfig?.getBucket,
+			rules: storageRules!,
+		});
+
+		app.use(
+			storageBasePath + "/*",
+			cors({
+				origin: storageOptions.corsOrigin ?? "*",
+				allowHeaders: storageOptions.corsAllowHeaders ?? ["*"],
+				allowMethods:
+					storageOptions.corsAllowMethods ?? [
+						"GET",
+						"HEAD",
+						"PUT",
+						"POST",
+						"DELETE",
+						"OPTIONS",
+					],
+			})
+		);
+
+		app.route("/", storageManager);
+	}
 ${authSetupBlock}${authMount}${authResolverBlock}
 	const resolveContext = async (
 		c: HonoContext

@@ -41,5 +41,37 @@ export async function loadConfig(
 			throw new Error(`Invalid config.auth.options in ${configPathAbs}`);
 		}
 	}
+
+	const storage = (config as AppflareConfig).storage;
+	if (storage !== undefined) {
+		if (!storage || typeof storage !== "object") {
+			throw new Error(`Invalid config.storage in ${configPathAbs}`);
+		}
+		if (!Array.isArray(storage.rules)) {
+			throw new Error(`Invalid config.storage.rules in ${configPathAbs}`);
+		}
+		if (
+			storage.basePath !== undefined &&
+			typeof storage.basePath !== "string"
+		) {
+			throw new Error(`Invalid config.storage.basePath in ${configPathAbs}`);
+		}
+		if (
+			storage.bucketBinding !== undefined &&
+			typeof storage.bucketBinding !== "string"
+		) {
+			throw new Error(
+				`Invalid config.storage.bucketBinding in ${configPathAbs}`
+			);
+		}
+		if (
+			storage.defaultCacheControl !== undefined &&
+			typeof storage.defaultCacheControl !== "string"
+		) {
+			throw new Error(
+				`Invalid config.storage.defaultCacheControl in ${configPathAbs}`
+			);
+		}
+	}
 	return { config: config as AppflareConfig, configDirAbs };
 }
