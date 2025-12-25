@@ -98,7 +98,7 @@ export function useQuery<TArgs, TResult, TError = unknown>(
 	return { ...query, websocket };
 }
 
-export {
+export type {
 	RealtimeMessage,
 	HandlerWebsocketOptions,
 	HandlerWithRealtime,

@@ -11,18 +11,21 @@
 		"./*": "./*.ts",
 		"./react/*": "./react/*.ts",
 		"./react": "./react/index.ts",
-		"./server/db": "./server/db.ts"
+		"./server/db": "./server/db.ts",
+		"./server/storage": "./server/storage.ts"
 	},
 	"scripts": {},
 	"devDependencies": {
 		"@types/react": "^18.3.12",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"@cloudflare/workers-types": "^4.20241112.0"
 	},
 	"dependencies": {
 		"@tanstack/react-query": "^5.90.12",
 		"commander": "^14.0.1",
 		"mongodb": "^7.0.0",
 		"react": "^18.3.1",
-		"zod": "^4.1.13"
+		"zod": "^4.1.13",
+		"hono": "^4.6.8"
 	}
 }

@@ -62,6 +62,55 @@ await tickets.updateMany({
 });
 ```
 
+## R2 Storage Manager (Hono)
+
+Use `createR2StorageManager` to mount authenticated, rule-driven storage routes on Cloudflare Workers (R2). Each rule declares a route, allowed methods, authorization hook, and key derivation so you can map requests to bucket object keys however you like.
+
+```ts
+import { Hono } from "hono";
+import { createR2StorageManager } from "@appflare/server/storage";
+
+const app = new Hono<{ Bindings: { BUCKET: R2Bucket } }>();
+
+app.route(
+	"/storage",
+	createR2StorageManager({
+		basePath: "/storage", // optional prefix
+		bucketBinding: "BUCKET", // or provide getBucket(c)
+		rules: [
+			{
+				route: "/private/*",
+				methods: ["GET", "PUT", "DELETE"],
+				authorize: async ({ c }) => {
+					const user = await verifySession(c.req); // your auth logic
+					return user
+						? { allow: true, principal: user }
+						: { allow: false, status: 401 };
+				},
+				deriveKey: ({ wildcard, principal }) => `${principal!.id}/${wildcard}`,
+				maxSizeBytes: 5 * 1024 * 1024,
+				cacheControl: "private, max-age=60",
+			},
+			{
+				route: "/public/*",
+				methods: ["GET", "HEAD", "PUT"],
+				authorize: () => ({ allow: true }),
+				deriveKey: ({ wildcard }) => `public/${wildcard}`,
+				cacheControl: "public, max-age=3600",
+			},
+		],
+	})
+);
+
+export default app;
+```
+
+Key behaviors:
+
+- `authorize` can attach a `principal` that flows into `deriveKey` for per-user folders.
+- `route` supports wildcards (`*`) to capture the remainder of the path; `defaultKey` mirrors the request path under the base path when `deriveKey` is omitted.
+- Supports `GET`/`HEAD` for reads, `PUT`/`POST` for writes, and `DELETE` for deletes. Size limits, cache control, and content type inference are configurable per rule.
+
 ## Core Concepts
 
 - **Context**: `createMongoDbContext` wires a MongoDB `Db`, a Zod schema map, and optional collection naming into typed table clients. Each table client wraps insert/update/delete/query logic and handles reference normalization.

@@ -2,6 +2,7 @@
 
 import { createAppflareApi } from "appflare-config/_generated/src/api";
 import { useMutation, useQuery } from "appflare/react";
+import { StorageManagerDemo } from "./components/storage-tester";
 
 const api = createAppflareApi({
 	baseUrl: "http://localhost:8787",
@@ -52,6 +53,7 @@ export default function Page() {
 				<input type="text" name="name" placeholder="Name" />
 				<button type="submit">Add User</button>
 			</form>
+			<StorageManagerDemo storage={api.storage} />
 		</main>
 	);
 }

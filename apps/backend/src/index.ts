@@ -3,11 +3,16 @@ import { WebSocketHibernationServer } from 'appflare-config/_generated/server/we
 import { MONGO_DURABLE_OBJECT } from 'cloudflare-do-mongo/do';
 import { getDatabase } from 'cloudflare-do-mongo';
 import { Db } from 'mongodb';
+import { createR2StorageManager } from 'appflare/server/storage';
+import type { Hono } from 'hono';
+import { cors } from 'hono/cors';
 
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
+		type WorkerEnv = { Bindings: Env };
+
 		const app = createAppflareHonoServer({
-			db: getDatabase(env.MONGO_DB) as any as Db,
+			db: getDatabase(env.MONGO_DB) as unknown as Db,
 			realtime: {
 				durableObject: env.WEBSOCKET_HIBERNATION_SERVER,
 				durableObjectName: 'primary',
@@ -21,7 +26,67 @@ export default {
 					});
 				},
 			},
+		}) as unknown as Hono<WorkerEnv>;
+
+		const storageManager = createR2StorageManager<WorkerEnv>({
+			bucketBinding: 'APPFLARE_STORAGE',
+			rules: [
+				{
+					route: '/readonly',
+					methods: ['GET', 'HEAD'],
+					cacheControl: 'public, max-age=300',
+				},
+				{
+					route: '/readonly',
+					methods: ['PUT', 'POST', 'DELETE'],
+					authorize: () => ({ allow: false, status: 405, message: 'Read-only bucket' }),
+				},
+				{
+					route: '/readonly/*',
+					methods: ['GET', 'HEAD'],
+					cacheControl: 'public, max-age=300',
+				},
+				{
+					route: '/readonly/*',
+					methods: ['PUT', 'POST', 'DELETE'],
+					authorize: () => ({ allow: false, status: 405, message: 'Read-only bucket' }),
+				},
+				{
+					route: '/json/*',
+					contentType: () => 'application/json',
+				},
+				{
+					route: '/uploads/*',
+					maxSizeBytes: 512 * 1024,
+				},
+				{
+					route: '/users/:userId/*',
+					authorize: ({ params, c }) => {
+						const userId = params.userId;
+						const headerUser = c.req.header('x-user-id');
+						if (headerUser && headerUser === userId) {
+							return { allow: true, principal: headerUser };
+						}
+						return {
+							allow: false,
+							status: 401,
+							message: 'x-user-id header required for user bucket',
+						};
+					},
+					deriveKey: ({ params, wildcard }) => `${params.userId}/${wildcard || 'root'}`,
+					cacheControl: 'private, max-age=0, must-revalidate',
+				},
+				{
+					// catch-all fallback must be last so more specific rules win
+					route: '/*',
+				},
+			],
+			basePath: '/storage',
 		});
+
+		app.use('/storage/*', cors({ origin: '*', allowHeaders: ['*'], allowMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'OPTIONS'] }));
+		app.route('/', storageManager);
+
 		const upgradeHeader = request.headers.get('Upgrade');
 		if (upgradeHeader === 'websocket') {
 			const url = new URL(request.url);

@@ -128,6 +128,39 @@ export type AppflareHandler<THandler extends AnyHandlerDefinition> = HandlerInvo
 > &
 	HandlerMetadata<THandler>;
 
+export type StoragePutResult = {
+	key: string;
+	size: number;
+	contentType: string;
+	cacheControl: string;
+};
+
+export type StorageDeleteResult = {
+	key: string;
+	deleted: boolean;
+};
+
+export type StorageManagerClient = {
+	url: (path: string) => string;
+	get: (path: string, init?: RequestInit) => Promise<Response>;
+	head: (path: string, init?: RequestInit) => Promise<Response>;
+	put: (
+		path: string,
+		body: BodyInit,
+		init?: RequestInit
+	) => Promise<StoragePutResult>;
+	post: (
+		path: string,
+		body: BodyInit,
+		init?: RequestInit
+	) => Promise<StoragePutResult>;
+	delete: (path: string, init?: RequestInit) => Promise<StorageDeleteResult>;
+};
+
+export type StorageManagerOptions = {
+	basePath?: string;
+};
+
 type RequestExecutor = (
 	input: RequestInfo | URL,
 	init?: RequestInit
@@ -166,12 +199,14 @@ export type MutationsClient = {{mutationsTypeDef}};
 export type AppflareApiClient = {
 	queries: QueriesClient;
 	mutations: MutationsClient;
+	storage: StorageManagerClient;
 };
 
 export type AppflareApiOptions = {
 	baseUrl?: string;
 	fetcher?: RequestExecutor;
 	realtime?: RealtimeConfig;
+	storage?: StorageManagerOptions;
 };
 
 export function createAppflareApi(options: AppflareApiOptions = {}): AppflareApiClient {
@@ -180,7 +215,8 @@ export function createAppflareApi(options: AppflareApiOptions = {}): AppflareApi
 	const realtime = resolveRealtimeConfig(baseUrl, options.realtime);
 	const queries: QueriesClient = {{queriesInit}};
 	const mutations: MutationsClient = {{mutationsInit}};
-	return { queries, mutations };
+	const storage = createStorageManagerClient(baseUrl, request, options.storage);
+	return { queries, mutations, storage };
 }
 
 `;
@@ -357,6 +393,55 @@ function serializeQueryValue(value: unknown): string {
 		return JSON.stringify(value);
 	}
 	return String(value);
+}
+
+function normalizeStorageBasePath(basePath?: string): string {
+	if (!basePath) return "/storage";
+	const prefixed = basePath.startsWith("/") ? basePath : \`/\${basePath}\`;
+	const trimmed = prefixed.replace(/\\/+$/, "");
+	return trimmed || "/storage";
+}
+
+function buildStoragePath(basePath: string, path: string): string {
+	const trimmedBase = basePath.endsWith("/") ? basePath.slice(0, -1) : basePath;
+	const normalizedPath = path.startsWith("/") ? path : \`/\${path}\`;
+	if (
+		normalizedPath === trimmedBase ||
+		normalizedPath.startsWith(\`\${trimmedBase}/\`)
+	) {
+		return normalizedPath;
+	}
+	return \`\${trimmedBase}\${normalizedPath}\`;
+}
+
+function createStorageManagerClient(
+	baseUrl: string,
+	request: RequestExecutor,
+	options?: StorageManagerOptions
+): StorageManagerClient {
+	const basePath = normalizeStorageBasePath(options?.basePath);
+	const toUrl = (path: string) => buildUrl(baseUrl, buildStoragePath(basePath, path));
+
+	const sendJson = async <T>(
+		method: string,
+		path: string,
+		init?: RequestInit
+	): Promise<T> => {
+		const response = await request(toUrl(path), { ...(init ?? {}), method });
+		return parseJson<T>(response);
+	};
+
+	return {
+		url: toUrl,
+		get: (path, init) => request(toUrl(path), { ...(init ?? {}), method: "GET" }),
+		head: (path, init) => request(toUrl(path), { ...(init ?? {}), method: "HEAD" }),
+		put: (path, body, init) =>
+			sendJson<StoragePutResult>("PUT", path, { ...(init ?? {}), body }),
+		post: (path, body, init) =>
+			sendJson<StoragePutResult>("POST", path, { ...(init ?? {}), body }),
+		delete: (path, init) =>
+			sendJson<StorageDeleteResult>("DELETE", path, { ...(init ?? {}) }),
+	};
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
