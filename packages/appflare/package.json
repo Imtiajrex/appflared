@@ -7,6 +7,8 @@
 	},
 	"exports": {
 		"./*": "./*.ts",
+		"./react/*": "./react/*.ts",
+		"./react": "./react/index.ts",
 		"./server/db": "./server/db.ts"
 	},
 	"scripts": {},

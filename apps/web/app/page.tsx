@@ -1,8 +1,7 @@
 "use client";
 
 import { createAppflareApi } from "appflare-config/_generated/src/api";
-import { useMutation } from "appflare/react/useMutation";
-import { useQuery } from "appflare/react/useQuery";
+import { useMutation, useQuery } from "appflare/react";
 
 const api = createAppflareApi({
 	baseUrl: "http://localhost:8787",
