@@ -17,10 +17,16 @@ export default {
 	dir: "./app", // Root folder containing your handlers
 	schema: "./schema.ts", // Path to the Zod schema file
 	outDir: "./_generated", // Where generated files are written
+	auth: {
+		// Optional: Better Auth config forwarded to the generated server
+		enabled: false,
+		basePath: "/auth",
+		options: {},
+	},
 };
 ```
 
-The loader in [packages/appflare/cli/core/config.ts](packages/appflare/cli/core/config.ts) validates presence and types of `dir`, `schema`, and `outDir` and resolves paths relative to the config file location.
+The loader in [packages/appflare/cli/core/config.ts](packages/appflare/cli/core/config.ts) validates presence and types of `dir`, `schema`, and `outDir`, lightly checks optional `auth` (base path, enabled flag, options object), and resolves paths relative to the config file location.
 
 ## Build pipeline
 

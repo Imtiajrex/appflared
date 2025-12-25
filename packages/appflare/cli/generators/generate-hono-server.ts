@@ -2,6 +2,7 @@ import {
 	DiscoveredHandler,
 	groupBy,
 	pascalCase,
+	AppflareConfig,
 	toImportPathFromGeneratedServer,
 } from "../utils/utils";
 
@@ -9,12 +10,18 @@ export function generateHonoServer(params: {
 	handlers: DiscoveredHandler[];
 	outDirAbs: string;
 	schemaPathAbs: string;
+	configPathAbs: string;
+	config: AppflareConfig;
 }): string {
 	const queries = params.handlers.filter((h) => h.kind === "query");
 	const mutations = params.handlers.filter((h) => h.kind === "mutation");
 	const schemaImportPath = toImportPathFromGeneratedServer(
 		params.outDirAbs,
 		params.schemaPathAbs
+	);
+	const configImportPath = toImportPathFromGeneratedServer(
+		params.outDirAbs,
+		params.configPathAbs
 	);
 
 	const localNameFor = (h: DiscoveredHandler): string =>
@@ -35,6 +42,21 @@ export function generateHonoServer(params: {
 			`import { ${specifiers.join(", ")} } from ${JSON.stringify(importPath)};`
 		);
 	}
+
+	const authImports = params.config.auth
+		? [
+				`import appflareConfig from ${JSON.stringify(configImportPath)};`,
+				`import { createBetterAuthRouter, initBetterAuth } from "appflare/server/auth";`,
+			].join("\n")
+		: "";
+
+	const authSetup = params.config.auth
+		? `const __appflareAuthConfig = (appflareConfig as any).auth;\nconst __appflareAuthBasePath = __appflareAuthConfig?.basePath ?? "/auth";\nconst __appflareAuthRouter = __appflareAuthConfig && __appflareAuthConfig.enabled !== false && __appflareAuthConfig.options\n\t? createBetterAuthRouter({\n\t\tauth: initBetterAuth(__appflareAuthConfig.options as any),\n\t})\n\t: undefined;`
+		: "";
+
+	const authMount = params.config.auth
+		? `\n\tif (__appflareAuthRouter) {\n\t\tapp.route(__appflareAuthBasePath, __appflareAuthRouter);\n\t}\n`
+		: "";
 
 	const routeLines: string[] = [];
 	for (const q of queries) {
@@ -96,6 +118,13 @@ import {
 	createMongoDbContext,
 	type MongoDbContext,
 } from "appflare/server/db";
+${
+	authImports
+		? `
+${authImports}
+`
+		: ""
+}
 
 import type { TableDocMap, TableNames } from "../src/schema-types";
 
@@ -104,6 +133,13 @@ ${importLines.join("\n")}
 export type AppflareDbContext = MongoDbContext<TableNames, TableDocMap>;
 
 export type AppflareServerContext = { db: AppflareDbContext };
+${
+	authSetup
+		? `
+${authSetup}
+`
+		: ""
+}
 
 export function createAppflareDbContext(params: {
 	db: import("mongodb").Db;
@@ -191,7 +227,7 @@ export function createAppflareHonoServer(options: AppflareHonoServerOptions): Ho
 			origin: options.corsOrigin ?? "*",
 		})
 	);
-
+${authMount}
 	${routeLines
 		.map((line) =>
 			line.replace(

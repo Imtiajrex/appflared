@@ -9,6 +9,9 @@ const api = createAppflareApi({
 	realtime: {
 		baseUrl: "ws://localhost:8787",
 	},
+	auth: {
+		baseURL: "http://localhost:8787",
+	},
 });
 export default function Page() {
 	const result = useQuery(api.queries.user.getUsers, {

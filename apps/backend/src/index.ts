@@ -1,3 +1,4 @@
+import type { BetterAuthOptions } from 'better-auth';
 import { createAppflareHonoServer } from 'appflare-config/_generated/server/server';
 import { WebSocketHibernationServer } from 'appflare-config/_generated/server/websocket-hibernation-server';
 import { MONGO_DURABLE_OBJECT } from 'cloudflare-do-mongo/do';
@@ -6,6 +7,8 @@ import { Db } from 'mongodb';
 import { createR2StorageManager } from 'appflare/server/storage';
 import type { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import appflareConfig from 'appflare-config/appflare.config';
+import { createBetterAuthRouter, initBetterAuth } from 'appflare/server/auth';
 
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
@@ -27,6 +30,19 @@ export default {
 				},
 			},
 		}) as unknown as Hono<WorkerEnv>;
+
+		const authConfig = (appflareConfig as any).auth;
+		const authOptions = authConfig?.options as BetterAuthOptions | undefined;
+		const authRouter =
+			authConfig && authConfig.enabled !== false && authOptions
+				? createBetterAuthRouter<BetterAuthOptions, WorkerEnv>({
+						// initBetterAuth will throw if required options (adapter/providers) are missing
+						auth: initBetterAuth(authOptions),
+					})
+				: undefined;
+		if (authRouter) {
+			app.route(authConfig.basePath ?? '/auth', authRouter);
+		}
 
 		const storageManager = createR2StorageManager<WorkerEnv>({
 			bucketBinding: 'APPFLARE_STORAGE',

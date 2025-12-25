@@ -122,13 +122,22 @@ async function buildFromConfig(params: {
 		configPathAbs,
 	});
 
-	const apiTs = generateApiClient({ handlers, outDirAbs });
+	const apiTs = generateApiClient({
+		handlers,
+		outDirAbs,
+		authBasePath:
+			config.auth && config.auth.enabled === false
+				? undefined
+				: (config.auth?.basePath ?? "/auth"),
+	});
 	await fs.writeFile(path.join(outDirAbs, "src", "api.ts"), apiTs);
 
 	const serverTs = generateHonoServer({
 		handlers,
 		outDirAbs,
 		schemaPathAbs,
+		configPathAbs,
+		config,
 	});
 	await fs.writeFile(path.join(outDirAbs, "server", "server.ts"), serverTs);
 

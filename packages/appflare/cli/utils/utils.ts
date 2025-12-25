@@ -1,10 +1,22 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import type { BetterAuthOptions } from "better-auth";
 
-export type AppflareConfig = {
+export type AppflareAuthConfig<
+	Options extends BetterAuthOptions = BetterAuthOptions,
+> = {
+	enabled?: boolean;
+	basePath?: string;
+	options?: Options;
+};
+
+export type AppflareConfig<
+	Options extends BetterAuthOptions = BetterAuthOptions,
+> = {
 	dir: string;
 	schema: string;
 	outDir: string;
+	auth?: AppflareAuthConfig<Options>;
 };
 
 export type HandlerKind = "query" | "mutation";

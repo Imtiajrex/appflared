@@ -22,6 +22,8 @@ const HEADER_TEMPLATE = `/* eslint-disable */
 
 import fetch from "better-fetch";
 import { z } from "zod";
+import type { BetterAuthClientOptions } from "better-auth/client";
+import { createAuthClient } from "better-auth/client";
 
 import type {
 	AnyValidator,
@@ -200,6 +202,7 @@ export type AppflareApiClient = {
 	queries: QueriesClient;
 	mutations: MutationsClient;
 	storage: StorageManagerClient;
+	auth?: ReturnType<typeof createAuthClient>;
 };
 
 export type AppflareApiOptions = {
@@ -207,6 +210,7 @@ export type AppflareApiOptions = {
 	fetcher?: RequestExecutor;
 	realtime?: RealtimeConfig;
 	storage?: StorageManagerOptions;
+	auth?: false | (BetterAuthClientOptions & { baseURL?: string });
 };
 
 export function createAppflareApi(options: AppflareApiOptions = {}): AppflareApiClient {
@@ -216,7 +220,16 @@ export function createAppflareApi(options: AppflareApiOptions = {}): AppflareApi
 	const queries: QueriesClient = {{queriesInit}};
 	const mutations: MutationsClient = {{mutationsInit}};
 	const storage = createStorageManagerClient(baseUrl, request, options.storage);
-	return { queries, mutations, storage };
+	const authBasePath = normalizeAuthBasePath({{authBasePath}}) ?? "/auth";
+	const auth = options.auth === false
+		? undefined
+		: createAuthClient({
+			...(options.auth ?? {}),
+			baseURL:
+				(options.auth as any)?.baseURL ??
+				buildUrl(baseUrl, authBasePath),
+		});
+	return { queries, mutations, storage, auth };
 }
 
 `;
@@ -317,6 +330,12 @@ function createHandlerWebsocket<TArgs, TResult>(
 `;
 
 const UTILITY_FUNCTIONS_TEMPLATE_PART3 = `
+function normalizeAuthBasePath(basePath?: string | null): string | undefined {
+	if (!basePath) return undefined;
+	const prefixed = basePath.startsWith("/") ? basePath : \`/\${basePath}\`;
+	return prefixed.replace(/\\/+$/, "") || "/auth";
+}
+
 function normalizeBaseUrl(baseUrl?: string): string {
 	if (!baseUrl) {
 		return "";
@@ -583,6 +602,7 @@ function generateClientInits(
 export function generateApiClient(params: {
 	handlers: DiscoveredHandler[];
 	outDirAbs: string;
+	authBasePath?: string;
 }): string {
 	const { importLines, importAliasBySource } = generateImports(params);
 	const { queriesByFile, mutationsByFile } = generateGroupedHandlers(
@@ -598,6 +618,8 @@ export function generateApiClient(params: {
 		importAliasBySource
 	);
 
+	const authBasePathLiteral = JSON.stringify(params.authBasePath ?? "/auth");
+
 	const typeBlocks = generateTypeBlocks(params.handlers, importAliasBySource);
 
 	return (
@@ -608,7 +630,8 @@ export function generateApiClient(params: {
 		CLIENT_TYPES_TEMPLATE.replace("{{queriesTypeDef}}", queriesTypeDef)
 			.replace("{{mutationsTypeDef}}", mutationsTypeDef)
 			.replace("{{queriesInit}}", queriesInit)
-			.replace("{{mutationsInit}}", mutationsInit) +
+			.replace("{{mutationsInit}}", mutationsInit)
+			.replace("{{authBasePath}}", authBasePathLiteral) +
 		UTILITY_FUNCTIONS_TEMPLATE
 	);
 }

@@ -111,6 +111,22 @@ Key behaviors:
 - `route` supports wildcards (`*`) to capture the remainder of the path; `defaultKey` mirrors the request path under the base path when `deriveKey` is omitted.
 - Supports `GET`/`HEAD` for reads, `PUT`/`POST` for writes, and `DELETE` for deletes. Size limits, cache control, and content type inference are configurable per rule.
 
+## Better Auth (Hono)
+
+Use `initBetterAuth` with `createBetterAuthRouter` to forward requests to a Better Auth instance from a Hono server. The generated server can also mount this automatically when `auth` is defined in `appflare.config.ts`.
+
+```ts
+import { Hono } from "hono";
+import { createBetterAuthRouter, initBetterAuth } from "appflare/server/auth";
+
+const app = new Hono();
+const auth = initBetterAuth({
+	// Better Auth options (adapter, providers, cookies, etc.)
+});
+
+app.route("/auth", createBetterAuthRouter({ auth }));
+```
+
 ## Core Concepts
 
 - **Context**: `createMongoDbContext` wires a MongoDB `Db`, a Zod schema map, and optional collection naming into typed table clients. Each table client wraps insert/update/delete/query logic and handles reference normalization.

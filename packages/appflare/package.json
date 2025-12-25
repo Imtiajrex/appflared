@@ -12,15 +12,17 @@
 		"./react/*": "./react/*.ts",
 		"./react": "./react/index.ts",
 		"./server/db": "./server/db.ts",
-		"./server/storage": "./server/storage.ts"
+		"./server/storage": "./server/storage.ts",
+		"./server/auth": "./server/auth.ts"
 	},
 	"scripts": {},
 	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20241112.0",
 		"@types/react": "^18.3.12",
-		"typescript": "^5.9.3",
-		"@cloudflare/workers-types": "^4.20241112.0"
+		"typescript": "^5.9.3"
 	},
 	"dependencies": {
+		"better-auth": "^1.4.9",
 		"@tanstack/react-query": "^5.90.12",
 		"commander": "^14.0.1",
 		"mongodb": "^7.0.0",

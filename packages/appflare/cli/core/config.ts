@@ -25,5 +25,21 @@ export async function loadConfig(
 	if (typeof config.outDir !== "string" || !config.outDir) {
 		throw new Error(`Invalid config.outDir in ${configPathAbs}`);
 	}
+
+	const auth = (config as AppflareConfig).auth;
+	if (auth !== undefined) {
+		if (!auth || typeof auth !== "object") {
+			throw new Error(`Invalid config.auth in ${configPathAbs}`);
+		}
+		if (auth.basePath !== undefined && typeof auth.basePath !== "string") {
+			throw new Error(`Invalid config.auth.basePath in ${configPathAbs}`);
+		}
+		if (auth.enabled !== undefined && typeof auth.enabled !== "boolean") {
+			throw new Error(`Invalid config.auth.enabled in ${configPathAbs}`);
+		}
+		if (auth.options !== undefined && typeof auth.options !== "object") {
+			throw new Error(`Invalid config.auth.options in ${configPathAbs}`);
+		}
+	}
 	return { config: config as AppflareConfig, configDirAbs };
 }
