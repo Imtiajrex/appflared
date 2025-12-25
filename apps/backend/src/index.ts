@@ -14,8 +14,17 @@ export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		type WorkerEnv = { Bindings: Env };
 
+		const authConfig = (appflareConfig as any).auth;
+		const authOptions = authConfig?.options as BetterAuthOptions | undefined;
+		const allowedOrigins = 'http://localhost:3000'
+			.split(',')
+			.map((origin) => origin.trim())
+			.filter(Boolean);
+		const resolveCorsOrigin = (origin: string | undefined | null) => (origin && allowedOrigins.includes(origin) ? origin : undefined);
+
 		const app = createAppflareHonoServer({
 			db: getDatabase(env.MONGO_DB) as unknown as Db,
+			corsOrigin: allowedOrigins,
 			realtime: {
 				durableObject: env.WEBSOCKET_HIBERNATION_SERVER,
 				durableObjectName: 'primary',
@@ -30,9 +39,38 @@ export default {
 				},
 			},
 		}) as unknown as Hono<WorkerEnv>;
+		const authCors = cors({
+			origin: resolveCorsOrigin,
+			credentials: true,
+			allowMethods: ['GET', 'POST', 'OPTIONS'],
+			allowHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+			exposeHeaders: ['set-cookie'],
+		});
+		app.use(
+			'*',
+			cors({
+				origin: resolveCorsOrigin,
+				credentials: true,
+				allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+				allowHeaders: ['Content-Type', 'Authorization', 'Cookie'],
+				exposeHeaders: ['set-cookie'],
+			}),
+		);
 
-		const authConfig = (appflareConfig as any).auth;
-		const authOptions = authConfig?.options as BetterAuthOptions | undefined;
+		const origin = request.headers.get('Origin');
+		const allowedOrigin = resolveCorsOrigin(origin);
+		if (request.method === 'OPTIONS') {
+			return new Response(null, {
+				status: 204,
+				headers: {
+					'Access-Control-Allow-Origin': allowedOrigin ?? '',
+					'Access-Control-Allow-Credentials': 'true',
+					'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+					'Access-Control-Allow-Headers': request.headers.get('Access-Control-Request-Headers') ?? 'Content-Type, Authorization, Cookie',
+					Vary: 'Origin',
+				},
+			});
+		}
 		const authRouter =
 			authConfig && authConfig.enabled !== false && authOptions
 				? createBetterAuthRouter<BetterAuthOptions, WorkerEnv>({
@@ -41,7 +79,9 @@ export default {
 					})
 				: undefined;
 		if (authRouter) {
-			app.route(authConfig.basePath ?? '/auth', authRouter);
+			const authBasePath = authConfig.basePath ?? '/auth';
+			app.use(`${authBasePath}/*`, authCors);
+			app.route(authBasePath, authRouter);
 		}
 
 		const storageManager = createR2StorageManager<WorkerEnv>({
@@ -113,7 +153,13 @@ export default {
 			}
 		}
 
-		return app.fetch(request, env, ctx);
+		const response = await app.fetch(request, env, ctx);
+		if (allowedOrigin) {
+			response.headers.set('Access-Control-Allow-Origin', allowedOrigin);
+			response.headers.set('Access-Control-Allow-Credentials', 'true');
+			response.headers.append('Vary', 'Origin');
+		}
+		return response;
 	},
 } satisfies ExportedHandler<Env>;
 

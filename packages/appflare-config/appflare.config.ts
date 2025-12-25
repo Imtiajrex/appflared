@@ -1,7 +1,10 @@
 import type { BetterAuthOptions } from "better-auth";
 
 const authOptions: Partial<BetterAuthOptions> = {
-	// Supply your Better Auth adapter, providers, and session settings here.
+	trustedOrigins: ["http://localhost:3000"],
+	emailAndPassword: {
+		enabled: true,
+	},
 };
 
 export default {
@@ -9,8 +12,8 @@ export default {
 	schema: "./schema.ts",
 	outDir: "./_generated",
 	auth: {
-		enabled: false,
-		basePath: "/auth",
+		enabled: true,
+		basePath: "/api/auth",
 		options: authOptions,
 	},
 };

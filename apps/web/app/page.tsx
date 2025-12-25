@@ -1,62 +1,112 @@
 "use client";
 
-import { createAppflareApi } from "appflare-config/_generated/src/api";
-import { useMutation, useQuery } from "appflare/react";
-import { StorageManagerDemo } from "./components/storage-tester";
+import Link from "next/link";
+import AppShell from "./components/app-shell";
+import { appflareEndpoints } from "./appflare-client";
 
-const api = createAppflareApi({
-	baseUrl: "http://localhost:8787",
-	realtime: {
-		baseUrl: "ws://localhost:8787",
+const cards = [
+	{
+		href: "/sign-up",
+		title: "Sign up",
+		description: "Create a user via Better Auth email flow.",
 	},
-	auth: {
-		baseURL: "http://localhost:8787",
+	{
+		href: "/sign-in",
+		title: "Sign in",
+		description: "Sign in, check session, and sign out.",
 	},
-});
+	{
+		href: "/users",
+		title: "Users",
+		description: "Query, create, update, and delete users.",
+	},
+	{
+		href: "/storage",
+		title: "Storage",
+		description: "Exercise storage url/get/put/post/delete APIs.",
+	},
+];
+
 export default function Page() {
-	const result = useQuery(api.queries.user.getUsers, {
-		realtime: {
-			enabled: true,
-		},
-		args: {
-			name: "User 1",
-			id: undefined,
-		},
-	});
-	const addUser = useMutation(api.mutations.user.createUser);
-
 	return (
-		<main
-			style={{ display: "grid", gap: "16px", padding: "32px", maxWidth: 720 }}
+		<AppShell
+			title="Appflare demo kit"
+			subtitle="A few focused pages to exercise Appflare auth, database handlers, and storage manager endpoints."
 		>
-			{result.data?.map((data) => (
-				<div
-					key={data._id}
-					style={{
-						padding: "8px",
-						border: "1px solid #4d4d4dff",
-						borderRadius: "4px",
-						backgroundColor: "#1b1b1bff",
-					}}
-				>
-					{data._id} - {data.name} - {data.tickets?.length} tickets -{" "}
-					{data.roombas?.length} roombas
-				</div>
-			))}
-			<form
-				onSubmit={async (e) => {
-					e.preventDefault();
-					const form = e.currentTarget.closest("form")!;
-					const formData = new FormData(form);
-					const name = formData.get("name") as string;
-					await addUser.mutateAsync({ name });
-					form.reset();
+			<section
+				style={{
+					display: "grid",
+					gap: "12px",
+					gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
 				}}
 			>
-				<input type="text" name="name" placeholder="Name" />
-				<button type="submit">Add User</button>
-			</form>
-			<StorageManagerDemo storage={api.storage} />
-		</main>
+				{cards.map((card) => (
+					<Link
+						key={card.href}
+						href={card.href}
+						style={{
+							padding: "16px",
+							borderRadius: "12px",
+							border: "1px solid #1f2937",
+							background: "linear-gradient(145deg, #0f172a, #111827)",
+							boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+							minHeight: 140,
+							display: "grid",
+							gap: "8px",
+							alignContent: "start",
+							transition: "transform 120ms ease, border-color 120ms ease",
+						}}
+						onMouseEnter={(e) =>
+							(e.currentTarget.style.transform = "translateY(-2px)")
+						}
+						onMouseLeave={(e) =>
+							(e.currentTarget.style.transform = "translateY(0)")
+						}
+					>
+						<div style={{ fontWeight: 700, fontSize: "16px" }}>
+							{card.title}
+						</div>
+						<p style={{ color: "#cbd5e1", lineHeight: 1.5 }}>
+							{card.description}
+						</p>
+						<span style={{ fontSize: "12px", color: "#6b7280" }}>
+							Open {card.href}
+						</span>
+					</Link>
+				))}
+			</section>
+			<section
+				style={{
+					display: "grid",
+					gap: "8px",
+					padding: "16px",
+					borderRadius: "12px",
+					border: "1px solid #1f2937",
+					background: "#0b1220",
+				}}
+			>
+				<div style={{ fontWeight: 700 }}>Environment</div>
+				<dl
+					style={{
+						display: "grid",
+						gridTemplateColumns: "max-content 1fr",
+						gap: "6px 12px",
+						color: "#cbd5e1",
+						fontSize: "14px",
+					}}
+				>
+					<dt style={{ color: "#9ca3af" }}>API base</dt>
+					<dd>{appflareEndpoints.baseUrl}</dd>
+					<dt style={{ color: "#9ca3af" }}>Realtime</dt>
+					<dd>{appflareEndpoints.realtimeUrl}</dd>
+					<dt style={{ color: "#9ca3af" }}>Auth</dt>
+					<dd>{appflareEndpoints.authUrl}</dd>
+				</dl>
+				<p style={{ color: "#9ca3af", fontSize: "13px" }}>
+					Override with NEXT_PUBLIC_APPFLARE_BASE_URL,
+					NEXT_PUBLIC_APPFLARE_REALTIME_URL, and NEXT_PUBLIC_APPFLARE_AUTH_URL.
+				</p>
+			</section>
+		</AppShell>
 	);
 }
