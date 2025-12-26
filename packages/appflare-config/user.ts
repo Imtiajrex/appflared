@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+	cron,
 	internalQuery,
 	mutation,
 	query,
@@ -50,6 +51,17 @@ export const testSchedule = scheduler({
 			data: { name: `Scheduled Update ${new Date().toISOString()}` },
 		});
 	},
+});
+export const testCron = cron({
+	handler: async (ctx) => {
+		console.log("Cron triggered at", new Date().toISOString());
+		await ctx.db.users.updateMany({
+			data: {
+				name: `Cron Update ${new Date().toISOString()}`,
+			},
+		});
+	},
+	cronTrigger: "*/1 * * * *",
 });
 
 // Test scheduler + enqueue helper to verify queue wiring.

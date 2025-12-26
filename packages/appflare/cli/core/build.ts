@@ -14,6 +14,7 @@ import {
 	generateHonoServer,
 	generateWebsocketDurableObject,
 	generateSchedulerHandlers,
+	generateCronHandlers,
 } from "./handlers";
 
 export async function buildFromConfig(params: {
@@ -99,6 +100,14 @@ export async function buildFromConfig(params: {
 		path.join(outDirAbs, "server", "scheduler.ts"),
 		schedulerTs
 	);
+
+	const { code: cronTs } = generateCronHandlers({
+		handlers,
+		outDirAbs,
+		schemaPathAbs,
+		configPathAbs,
+	});
+	await fs.writeFile(path.join(outDirAbs, "server", "cron.ts"), cronTs);
 
 	if (emit) {
 		// Remove previous emit output to avoid stale files lingering.

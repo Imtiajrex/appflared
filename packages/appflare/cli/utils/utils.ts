@@ -47,13 +47,15 @@ export type HandlerKind =
 	| "mutation"
 	| "internalQuery"
 	| "internalMutation"
-	| "scheduler";
+	| "scheduler"
+	| "cron";
 
 export type DiscoveredHandler = {
 	fileName: string;
 	name: string;
 	kind: HandlerKind;
 	sourceFileAbs: string;
+	cronTriggers?: string[];
 };
 
 export function pascalCase(value: string): string {

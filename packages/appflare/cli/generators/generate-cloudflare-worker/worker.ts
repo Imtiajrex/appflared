@@ -2,9 +2,16 @@ import { resolveAllowedOrigins } from "./helpers";
 
 export function generateCloudflareWorkerIndex(params: {
 	allowedOrigins?: string[];
+	hasCronHandlers?: boolean;
 }): string {
 	const allowedOrigins = resolveAllowedOrigins(params.allowedOrigins);
 	const allowedOriginsCsv = allowedOrigins.join(",");
+	const cronImports = params.hasCronHandlers
+		? 'import { handleCron } from "./cron";\n'
+		: "";
+	const scheduledBlock = params.hasCronHandlers
+		? `\n\tasync scheduled(controller, env, ctx): Promise<void> {\n\t\tawait handleCron({ controller, env, ctx });\n\t},\n`
+		: "";
 
 	return `/* eslint-disable */
 /**
@@ -15,7 +22,7 @@ export function generateCloudflareWorkerIndex(params: {
 import { createAppflareHonoServer } from "./server";
 import { WebSocketHibernationServer } from "./websocket-hibernation-server";
 import { createScheduler, handleSchedulerBatch } from "./scheduler";
-import { getDatabase } from "cloudflare-do-mongo";
+${cronImports}import { getDatabase } from "cloudflare-do-mongo";
 import { MONGO_DURABLE_OBJECT } from "cloudflare-do-mongo/do";
 import type { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -130,9 +137,10 @@ export default {
 		return response;
 	},
 
-		async queue(batch, env): Promise<void> {
-			await handleSchedulerBatch({ batch, env });
-		},
+${scheduledBlock}
+	async queue(batch, env): Promise<void> {
+		await handleSchedulerBatch({ batch, env });
+	},
 } satisfies ExportedHandler<Env>;
 
 export { MONGO_DURABLE_OBJECT, WebSocketHibernationServer };

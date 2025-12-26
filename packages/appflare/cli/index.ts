@@ -12,6 +12,7 @@ import {
 	generateHonoServer,
 	generateWebsocketDurableObject,
 	generateSchedulerHandlers,
+	generateCronHandlers,
 } from "./core/handlers";
 import {
 	generateCloudflareWorkerIndex,
@@ -19,22 +20,11 @@ import {
 } from "./generators/generate-cloudflare-worker";
 import { generateSchemaTypes, getSchemaTableNames } from "./schema/schema";
 import { runTscEmit, writeEmitTsconfig } from "./utils/tsc";
-import { assertDirExists, assertFileExists } from "./utils/utils";
-
-type AppflareConfig = {
-	dir: string;
-	schema: string;
-	outDir: string;
-	/** Optional override for where wrangler.json is written. Resolved relative to the config file. */
-	wranglerOutPath?: string;
-	/** Optional override for wrangler.json main entrypoint. Defaults to ./server/index.ts in the generated worker. */
-	wranglerMain?: string;
-	corsOrigin?: string | string[];
-	auth?: {
-		enabled?: boolean;
-		basePath?: string;
-	};
-};
+import {
+	AppflareConfig,
+	assertDirExists,
+	assertFileExists,
+} from "./utils/utils";
 
 type WatchConfig = {
 	targets: string[];
@@ -212,18 +202,33 @@ async function buildFromConfig(params: {
 		schedulerTs
 	);
 
+	const cronHandlersPresent = handlers.some(
+		(handler) => handler.kind === "cron"
+	);
+	const { code: cronTs, cronTriggers } = generateCronHandlers({
+		handlers,
+		outDirAbs,
+		schemaPathAbs,
+		configPathAbs,
+	});
+	await fs.writeFile(path.join(outDirAbs, "server", "cron.ts"), cronTs);
+
 	const allowedOrigins = normalizeAllowedOrigins(
 		process.env.APPFLARE_ALLOWED_ORIGINS ??
 			config.corsOrigin ??
 			"http://localhost:3000"
 	);
-	const workerIndexTs = generateCloudflareWorkerIndex({ allowedOrigins });
+	const workerIndexTs = generateCloudflareWorkerIndex({
+		allowedOrigins,
+		hasCronHandlers: cronHandlersPresent,
+	});
 	await fs.writeFile(path.join(outDirAbs, "server", "index.ts"), workerIndexTs);
 
 	const wranglerJson = generateWranglerJson({
 		config,
 		configDirAbs,
 		allowedOrigins,
+		cronTriggers,
 	});
 	const wranglerOutPath =
 		config.wranglerOutPath ?? path.join(config.outDir, "wrangler.json");

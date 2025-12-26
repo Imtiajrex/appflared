@@ -60,5 +60,10 @@
         "queue": "appflare-config-scheduler"
       }
     ]
+  },
+  "triggers": {
+    "crons": [
+      "*/1 * * * *"
+    ]
   }
 }

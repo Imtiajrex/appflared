@@ -11,6 +11,7 @@ export function generateWranglerJson(params: {
 	config: AppflareConfig;
 	configDirAbs: string;
 	allowedOrigins?: string[];
+	cronTriggers?: string[];
 }): string {
 	const allowedOrigins = resolveAllowedOrigins(params.allowedOrigins);
 	const bucketBinding =
@@ -79,6 +80,12 @@ export function generateWranglerJson(params: {
 					queue: schedulerQueueName,
 				},
 			],
+		};
+	}
+
+	if (params.cronTriggers && params.cronTriggers.length > 0) {
+		wrangler.triggers = {
+			crons: Array.from(new Set(params.cronTriggers)),
 		};
 	}
 

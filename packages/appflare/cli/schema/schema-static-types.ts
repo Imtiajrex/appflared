@@ -256,6 +256,35 @@ export const scheduler = <TArgs extends QueryArgsShape | undefined = undefined, 
 	definition: SchedulerDefinition<TArgs, Env>
 ): SchedulerDefinition<TArgs, Env> => definition;
 
+type ScheduledController = {
+	cron: string;
+	scheduledTime?: number;
+	nextScheduledTime?: number;
+};
+
+type ExecutionContext = {
+	waitUntil(promise: Promise<unknown>): void;
+};
+
+type CronTriggerInput = string | readonly string[];
+
+export type CronContext<Env = unknown> = AppflareAuthContext & {
+	db: DatabaseReader;
+	scheduler?: Scheduler;
+	env: Env;
+	controller: ScheduledController;
+	ctx: ExecutionContext;
+};
+
+export type CronDefinition<Env = unknown> = {
+	cronTrigger: CronTriggerInput;
+	handler: (ctx: CronContext<Env>) => Promise<void>;
+};
+
+export const cron = <Env = unknown>(
+	definition: CronDefinition<Env>
+): CronDefinition<Env> => definition;
+
 export interface QueryContext extends AppflareAuthContext {
 	db: DatabaseReader;
 	scheduler?: Scheduler;

@@ -4,3 +4,4 @@ export { generateApiClient } from "../generators/generate-api-client";
 export { generateHonoServer } from "../generators/generate-hono-server";
 export { generateWebsocketDurableObject } from "../generators/generate-websocket-durable-object";
 export { generateSchedulerHandlers } from "../generators/generate-scheduler-handlers";
+export { generateCronHandlers } from "../generators/generate-cron-handlers";
