@@ -1,6 +1,18 @@
 export const buildTypeHelpersBlock = (): string => `
 type SchedulerHandlers = typeof schedulerHandlers;
 
+type SchedulerHandlerPayloads = {
+	[Task in keyof SchedulerHandlers]: SchedulerHandlers[Task] extends {
+		run: (ctx: unknown, payload: infer TPayload) => Promise<void>;
+	}
+		? TPayload
+		: unknown;
+};
+
+declare global {
+	interface AppflareSchedulerHandlerMap extends SchedulerHandlerPayloads {}
+}
+
 type SchedulerTaskName = keyof SchedulerHandlers extends never
 	? string
 	: keyof SchedulerHandlers;
@@ -43,7 +55,6 @@ type SchedulerEnqueue = {
 			? [payload?: SchedulerPayload<TTask>, options?: SchedulerEnqueueOptions]
 			: [payload: SchedulerPayload<TTask>, options?: SchedulerEnqueueOptions]
 	): Promise<void>;
-	(task: string, payload?: unknown, options?: SchedulerEnqueueOptions): Promise<void>;
 };
 
 type TypedScheduler = Omit<Scheduler, "enqueue"> & {

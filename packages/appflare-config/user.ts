@@ -24,11 +24,22 @@ export const getUsers = query({
 			include: { roombas: true, tickets: true },
 		});
 
-		await ctx.scheduler?.enqueue("user/testSchedule", {
-			userId: ctx.user.id,
+		await ctx.scheduler?.enqueue("user/sendEmail", {
+			email: ctx.user.email,
+			name: ctx.user.name,
 		});
 
 		return users;
+	},
+});
+export const sendEmail = scheduler({
+	args: {
+		email: z.string().email().optional(),
+		name: z.string().optional(),
+	},
+	handler: async (ctx, payload) => {
+		console.log("Sending email to:", payload.email);
+		// Simulate email sending logic here
 	},
 });
 export const testSchedule = scheduler({
@@ -50,7 +61,7 @@ export const enqueueTestSchedule = mutation({
 	handler: async (ctx, args) => {
 		await ctx.scheduler?.enqueue(
 			"user/testSchedule",
-			{ userId: args.userId ?? ctx.user?.id ?? null },
+			null,
 			args.delaySeconds ? { delaySeconds: args.delaySeconds } : undefined
 		);
 		return { enqueued: true };

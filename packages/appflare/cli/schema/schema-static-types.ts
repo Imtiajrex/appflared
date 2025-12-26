@@ -205,14 +205,34 @@ export type AppflareModelMap = {
 
 export type DatabaseReader = AppflareModelMap;
 
+declare global {
+	interface AppflareSchedulerHandlerMap {}
+}
+
+type SchedulerTaskKeys = keyof AppflareSchedulerHandlerMap;
+
+export type SchedulerTaskName = [SchedulerTaskKeys] extends [never]
+	? string
+	: SchedulerTaskKeys;
+
+export type SchedulerPayload<TTask extends SchedulerTaskName> =
+	TTask extends keyof AppflareSchedulerHandlerMap
+		? AppflareSchedulerHandlerMap[TTask]
+		: unknown;
+
 export type SchedulerEnqueueOptions = { delaySeconds?: number };
 
+type SchedulerEnqueueTyped = {
+	<TTask extends SchedulerTaskName>(
+		task: TTask,
+		...args: SchedulerPayload<TTask> extends undefined
+			? [payload?: SchedulerPayload<TTask>, options?: SchedulerEnqueueOptions]
+			: [payload: SchedulerPayload<TTask>, options?: SchedulerEnqueueOptions]
+	): Promise<void>;
+};
+
 export type Scheduler = {
-	enqueue: (
-		task: string,
-		payload?: unknown,
-		options?: SchedulerEnqueueOptions
-	) => Promise<void>;
+	enqueue: SchedulerEnqueueTyped;
 };
 
 export type SchedulerContext<Env = unknown> = AppflareAuthContext & {
@@ -222,15 +242,19 @@ export type SchedulerContext<Env = unknown> = AppflareAuthContext & {
 };
 
 export type SchedulerDefinition<
-	TPayload = unknown,
+	TArgs extends QueryArgsShape | undefined = undefined,
 	Env = unknown,
 > = {
-	handler: (ctx: SchedulerContext<Env>, payload: TPayload) => Promise<void>;
+	args?: TArgs;
+	handler: (
+		ctx: SchedulerContext<Env>,
+		payload: TArgs extends QueryArgsShape ? InferQueryArgs<TArgs> : undefined
+	) => Promise<void>;
 };
 
-export const scheduler = <TPayload = unknown, Env = unknown>(
-	definition: SchedulerDefinition<TPayload, Env>
-): SchedulerDefinition<TPayload, Env> => definition;
+export const scheduler = <TArgs extends QueryArgsShape | undefined = undefined, Env = unknown>(
+	definition: SchedulerDefinition<TArgs, Env>
+): SchedulerDefinition<TArgs, Env> => definition;
 
 export interface QueryContext extends AppflareAuthContext {
 	db: DatabaseReader;
