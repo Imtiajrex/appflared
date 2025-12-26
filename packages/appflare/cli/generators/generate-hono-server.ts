@@ -131,10 +131,16 @@ export function generateHonoServer(params: {
 				`\t${JSON.stringify(`/queries/${q.fileName}/${q.name}`)},\n` +
 				`\tsValidator("query", z.object(${local}.args as any)),\n` +
 				`\tasync (c) => {\n` +
-				`\t\tconst query = c.req.valid("query");\n` +
-				`\t\tconst ctx = await resolveContext(c);\n` +
-				`\t\tconst result = await ${local}.handler(ctx as any, query as any);\n` +
-				`\t\treturn c.json(result, 200);\n` +
+				`\t\ttry {\n` +
+				`\t\t\tconst query = c.req.valid("query");\n` +
+				`\t\t\tconst ctx = await resolveContext(c);\n` +
+				`\t\t\tconst result = await ${local}.handler(ctx as any, query as any);\n` +
+				`\t\t\treturn c.json(result, 200);\n` +
+				`\t\t} catch (err) {\n` +
+				`\t\t\tconst { status, body } = formatHandlerError(err);\n` +
+				`\t\t\tconsole.error("Appflare query handler error", err);\n` +
+				`\t\t\treturn c.json(body as any, status);\n` +
+				`\t\t}\n` +
 				`\t}\n` +
 				`);`
 		);
@@ -146,22 +152,28 @@ export function generateHonoServer(params: {
 				`\t${JSON.stringify(`/mutations/${m.fileName}/${m.name}`)},\n` +
 				`\tsValidator("json", z.object(${local}.args as any)),\n` +
 				`\tasync (c) => {\n` +
-				`\t\tconst body = c.req.valid("json");\n` +
-				`\t\tconst ctx = await resolveContext(c);\n` +
-				`\t\tconst result = await ${local}.handler(ctx as any, body as any);\n` +
-				`\t\tif (notifyMutation) {\n` +
-				`\t\t\ttry {\n` +
-				`\t\t\t\tawait notifyMutation({\n` +
+				`\t\ttry {\n` +
+				`\t\t\tconst body = c.req.valid("json");\n` +
+				`\t\t\tconst ctx = await resolveContext(c);\n` +
+				`\t\t\tconst result = await ${local}.handler(ctx as any, body as any);\n` +
+				`\t\t\tif (notifyMutation) {\n` +
+				`\t\t\t\ttry {\n` +
+				`\t\t\t\t\tawait notifyMutation({\n` +
 				`\t\t\t\t\t table: normalizeTableName(${JSON.stringify(m.fileName)}),\n` +
 				`\t\t\t\t\t handler: { file: ${JSON.stringify(m.fileName)}, name: ${JSON.stringify(m.name)} },\n` +
 				`\t\t\t\t\t args: body,\n` +
 				`\t\t\t\t\t result,\n` +
 				`\t\t\t\t});\n` +
-				`\t\t\t} catch (err) {\n` +
-				`\t\t\t\tconsole.error("Appflare realtime notification failed", err);\n` +
+				`\t\t\t\t} catch (err) {\n` +
+				`\t\t\t\t\tconsole.error("Appflare realtime notification failed", err);\n` +
+				`\t\t\t\t}\n` +
 				`\t\t\t}\n` +
+				`\t\t\treturn c.json(result, 200);\n` +
+				`\t\t} catch (err) {\n` +
+				`\t\t\tconst { status, body } = formatHandlerError(err);\n` +
+				`\t\t\tconsole.error("Appflare mutation handler error", err);\n` +
+				`\t\t\treturn c.json(body as any, status);\n` +
 				`\t\t}\n` +
-				`\t\treturn c.json(result, 200);\n` +
 				`\t}\n` +
 				`);`
 		);
@@ -284,6 +296,33 @@ function normalizeStorageBasePath(basePath?: string): string {
 	return withLeadingSlash.endsWith("/")
 		? withLeadingSlash.slice(0, -1) || "/"
 		: withLeadingSlash;
+}
+
+function formatHandlerError(err: unknown): {
+	status: number;
+	body: { error: string; details?: unknown };
+} {
+	const statusCandidate =
+		typeof err === "object" && err !== null
+			? Number((err as any).status ?? (err as any).statusCode)
+			: undefined;
+	const status = Number.isFinite(statusCandidate)
+		? Number(statusCandidate)
+		: 500;
+
+	const message =
+		err instanceof Error
+			? err.message
+			: typeof err === "string"
+				? err
+				: "Unknown error";
+	const includeDetails =
+		err && typeof err === "object" && !(err instanceof Error) && !Array.isArray(err);
+
+	return {
+		status,
+		body: includeDetails ? { error: message, details: err } : { error: message },
+	};
 }
 
 export function createAppflareHonoServer(options: AppflareHonoServerOptions): Hono {

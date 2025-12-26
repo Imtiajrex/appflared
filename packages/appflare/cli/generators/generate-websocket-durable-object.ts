@@ -197,6 +197,31 @@ const resolveDatabase = (env: any) => {
 	return db;
 };
 
+const formatHandlerError = (
+	err: unknown
+): { error: string; details?: unknown } => {
+	const message =
+		err instanceof Error
+			? err.message
+			: typeof err === "string"
+				? err
+				: "Unknown error";
+	const includeDetails =
+		err && typeof err === "object" && !(err instanceof Error) && !Array.isArray(err);
+	return includeDetails ? { error: message, details: err } : { error: message };
+};
+
+type ErrorEnvelope = { __appflareError: true; payload: { error: string; details?: unknown } };
+
+const makeErrorEnvelope = (err: unknown): ErrorEnvelope => ({
+	__appflareError: true,
+	payload: formatHandlerError(err),
+});
+
+const isErrorEnvelope = (value: unknown): value is ErrorEnvelope => {
+	return !!value && typeof value === "object" && (value as any).__appflareError === true;
+};
+
 const handlerKey = (handler: SubscriptionQueryHandler): string =>
 	handler.file + "/" + handler.name;
 
@@ -298,30 +323,46 @@ export class WebSocketHibernationServer extends DurableObject {
 	}
 
 	private async handleSubscribe(sub: Subscription): Promise<Response> {
-		const subWithAuth = await this.withAuth(sub);
-		const { 0: client, 1: server } = Object.values(new WebSocketPair());
-		server.serializeAttachment(subWithAuth);
-		this.ctx.acceptWebSocket(server);
-		this.subscriptions.set(server, subWithAuth);
-		server.send(
-			JSON.stringify({ type: "subscribed", subscription: subWithAuth })
-		);
-
 		try {
-			const data = await this.fetchData(subWithAuth);
+			const subWithAuth = await this.withAuth(sub);
+			const { 0: client, 1: server } = Object.values(new WebSocketPair());
+			server.serializeAttachment(subWithAuth);
+			this.ctx.acceptWebSocket(server);
+			this.subscriptions.set(server, subWithAuth);
 			server.send(
-				JSON.stringify({
-					type: "data",
-					table: subWithAuth.table,
-					where: subWithAuth.where,
-					data,
-				})
+				JSON.stringify({ type: "subscribed", subscription: subWithAuth })
 			);
-		} catch (err) {
-			console.error("Failed to send initial payload", err);
-		}
 
-		return new Response(null, { status: 101, webSocket: client });
+			try {
+				const data = await this.fetchData(subWithAuth);
+				server.send(
+					JSON.stringify({
+						type: "data",
+						table: subWithAuth.table,
+						where: subWithAuth.where,
+						data,
+					})
+				);
+			} catch (err) {
+				const formatted = makeErrorEnvelope(err).payload;
+				console.error("Failed to send initial payload", err);
+				server.send(
+					JSON.stringify({
+						type: "error",
+						...formatted,
+					})
+				);
+			}
+
+			return new Response(null, { status: 101, webSocket: client });
+		} catch (err) {
+			const formatted = formatHandlerError(err);
+			console.error("Websocket subscription setup failed", err);
+			return new Response(JSON.stringify(formatted), {
+				status: 500,
+				headers: { "content-type": "application/json" },
+			});
+		}
 	}
 
 	private parseSubscription(params: URLSearchParams): ParsedSubscription {
@@ -430,7 +471,12 @@ export class WebSocketHibernationServer extends DurableObject {
 		for (const [, sub] of matches) {
 			const key = this.subscriptionKey(sub);
 			if (!cache.has(key)) {
-				cache.set(key, await this.fetchData(sub));
+				try {
+					cache.set(key, await this.fetchData(sub));
+				} catch (err) {
+					cache.set(key, makeErrorEnvelope(err));
+					console.error("Failed to fetch subscription data for notification", err);
+				}
 			}
 		}
 
@@ -438,6 +484,15 @@ export class WebSocketHibernationServer extends DurableObject {
 			const key = this.subscriptionKey(sub);
 			const data = cache.get(key);
 			try {
+				if (isErrorEnvelope(data)) {
+					socket.send(
+						JSON.stringify({
+							type: "error",
+							...data.payload,
+						})
+					);
+					continue;
+				}
 				socket.send(
 					JSON.stringify({
 						type: "data",
