@@ -14,6 +14,7 @@ export function generateCloudflareWorkerIndex(params: {
 
 import { createAppflareHonoServer } from "./server";
 import { WebSocketHibernationServer } from "./websocket-hibernation-server";
+import { createScheduler, handleSchedulerBatch } from "./scheduler";
 import { getDatabase } from "cloudflare-do-mongo";
 import { MONGO_DURABLE_OBJECT } from "cloudflare-do-mongo/do";
 import type { Hono } from "hono";
@@ -32,6 +33,9 @@ type Env = {
 	MONGO_DURABLE_OBJECT: DurableObjectNamespaceLike;
 	APPFLARE_STORAGE?: unknown;
 	ALLOWED_ORIGINS?: string;
+	APPFLARE_SCHEDULER_QUEUE?: {
+		send: (body: unknown, options?: { delaySeconds?: number }) => Promise<void>;
+	};
 };
 
 type WorkerEnv = { Bindings: Env };
@@ -56,6 +60,9 @@ export default {
 		const allowedOrigins = parseAllowedOrigins(env.ALLOWED_ORIGINS);
 		const resolveOrigin = (origin: string | null) =>
 			resolveCorsOrigin(origin, allowedOrigins);
+		const scheduler = env.APPFLARE_SCHEDULER_QUEUE
+			? createScheduler(env.APPFLARE_SCHEDULER_QUEUE)
+			: undefined;
 
 		const app = createAppflareHonoServer({
 			db: getDatabase(env.MONGO_DB) as unknown as Db,
@@ -73,6 +80,7 @@ export default {
 					});
 				},
 			},
+			scheduler,
 		}) as unknown as Hono<WorkerEnv>;
 
 		app.use(
@@ -121,6 +129,10 @@ export default {
 		}
 		return response;
 	},
+
+		async queue(batch, env): Promise<void> {
+			await handleSchedulerBatch({ batch, env });
+		},
 } satisfies ExportedHandler<Env>;
 
 export { MONGO_DURABLE_OBJECT, WebSocketHibernationServer };

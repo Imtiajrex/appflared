@@ -40,6 +40,7 @@ import type {
 \tAppflareAuthUser,
 \tTableDocMap,
 \tTableNames,
+\tScheduler,
 } from "../src/schema-types";
 
 ${handlerImportBlock}
@@ -47,7 +48,8 @@ ${handlerImportBlock}
 export type AppflareDbContext = MongoDbContext<TableNames, TableDocMap>;
 
 export type AppflareServerContext = AppflareAuthContext & {
-\tdb: AppflareDbContext;
+	db: AppflareDbContext;
+	scheduler?: Scheduler;
 };
 
 export function createAppflareDbContext(params: {
@@ -94,12 +96,17 @@ export type AppflareHonoServerOptions = {
 \tdb?: import("mongodb").Db;
 \t/** Provide a per-request Mongo Db instance (e.g. from Cloudflare env bindings). */
 \tgetDb?: (c: HonoContext) => import("mongodb").Db | Promise<import("mongodb").Db>;
+	/** Provide a scheduler instance for enqueueing background work. */
+	scheduler?: Scheduler;
+	/** Provide a per-request scheduler instance (e.g. derived from env bindings). */
+	getScheduler?: (c: HonoContext) => Scheduler | Promise<Scheduler>;
 \t/** Optionally extend the context beyond the db wrapper. */
-\tcreateContext?: (
-\t\tc: HonoContext,
-\t\tdb: AppflareDbContext,
-\t\tauth: AppflareAuthContext
-\t) => AppflareServerContext | Promise<AppflareServerContext>;
+	createContext?: (
+		c: HonoContext,
+		db: AppflareDbContext,
+		auth: AppflareAuthContext,
+		scheduler?: Scheduler
+	) => AppflareServerContext | Promise<AppflareServerContext>;
 \tcollectionName?: (table: TableNames) => string;
 \tcorsOrigin?: string | string[];
 \trealtime?: RealtimeOptions;
@@ -165,18 +172,28 @@ export function createAppflareHonoServer(options: AppflareHonoServerOptions): Ho
 \t\t);
 \t}
 
-\tconst resolveDb = async (c: HonoContext): Promise<AppflareDbContext> => {
-\t\tif (fixedDb) return fixedDb;
-\t\tconst db = await options.getDb!(c);
-\t\treturn createAppflareDbContext({
-\t\t\tdb,
-\t\t\tcollectionName: options.collectionName,
-\t\t});
-\t};
+	const resolveDb = async (c: HonoContext): Promise<AppflareDbContext> => {
+		if (fixedDb) return fixedDb;
+		const db = await options.getDb!(c);
+		return createAppflareDbContext({
+			db,
+			collectionName: options.collectionName,
+		});
+	};
 
-\tconst createContext =
-\t\toptions.createContext ??
-\t\t((_c, db, auth) => ({ db, ...auth }) as AppflareServerContext);
+	const fixedScheduler = options.scheduler;
+	const resolveScheduler = async (
+		c: HonoContext
+	): Promise<Scheduler | undefined> => {
+		if (fixedScheduler) return fixedScheduler;
+		if (!options.getScheduler) return undefined;
+		return options.getScheduler(c);
+	};
+
+	const createContext =
+		options.createContext ??
+		((_c, db, auth, scheduler) =>
+			({ db, scheduler, ...auth } as AppflareServerContext));
 \tconst notifyMutation = createMutationNotifier(options.realtime);
 \tconst app = new Hono();
 \tapp.use(
@@ -228,13 +245,14 @@ export function createAppflareHonoServer(options: AppflareHonoServerOptions): Ho
 \t\tapp.route("/", storageManager);
 \t}
 ${params.authSetupBlock}${params.authMountBlock}${params.authResolverBlock}\tconst resolveContext = async (
-\t\tc: HonoContext
-\t): Promise<AppflareServerContext> => {
-\t\tconst db = await resolveDb(c);
-\t\tconst auth = await resolveAuthContext(c);
-\t\tconst ctx = await createContext(c, db, auth);
-\t\treturn ctx ?? ({ db, ...auth } as AppflareServerContext);
-\t};
+		c: HonoContext
+	): Promise<AppflareServerContext> => {
+		const db = await resolveDb(c);
+		const auth = await resolveAuthContext(c);
+		const scheduler = await resolveScheduler(c);
+		const ctx = await createContext(c, db, auth, scheduler);
+		return ctx ?? ({ db, scheduler, ...auth } as AppflareServerContext);
+	};
 
 \t${params.routeLines.join("\n\n\t")}
 

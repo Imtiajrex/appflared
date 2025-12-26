@@ -16,6 +16,15 @@ export type AppflareStorageConfig<
 	Principal = unknown,
 > = StorageManagerOptions<Env, Principal>;
 
+export type AppflareSchedulerConfig = {
+	/** Set to false to disable scheduler generation. */
+	enabled?: boolean;
+	/** Optional Cloudflare Queue binding name. Defaults to APPFLARE_SCHEDULER_QUEUE. */
+	queueBinding?: string;
+	/** Optional Cloudflare Queue name. Defaults to a sanitized worker name with -scheduler suffix. */
+	queueName?: string;
+};
+
 export type AppflareConfig<
 	Options extends BetterAuthOptions = BetterAuthOptions,
 > = {
@@ -26,13 +35,15 @@ export type AppflareConfig<
 	corsOrigin?: string | string[];
 	auth?: AppflareAuthConfig<Options>;
 	storage?: AppflareStorageConfig;
+	scheduler?: AppflareSchedulerConfig;
 };
 
 export type HandlerKind =
 	| "query"
 	| "mutation"
 	| "internalQuery"
-	| "internalMutation";
+	| "internalMutation"
+	| "scheduler";
 
 export type DiscoveredHandler = {
 	fileName: string;

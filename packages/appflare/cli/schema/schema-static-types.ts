@@ -205,12 +205,41 @@ export type AppflareModelMap = {
 
 export type DatabaseReader = AppflareModelMap;
 
+export type SchedulerEnqueueOptions = { delaySeconds?: number };
+
+export type Scheduler = {
+	enqueue: (
+		task: string,
+		payload?: unknown,
+		options?: SchedulerEnqueueOptions
+	) => Promise<void>;
+};
+
+export type SchedulerContext<Env = unknown> = AppflareAuthContext & {
+	db: DatabaseReader;
+	scheduler: Scheduler;
+	env: Env;
+};
+
+export type SchedulerDefinition<
+	TPayload = unknown,
+	Env = unknown,
+> = {
+	handler: (ctx: SchedulerContext<Env>, payload: TPayload) => Promise<void>;
+};
+
+export const scheduler = <TPayload = unknown, Env = unknown>(
+	definition: SchedulerDefinition<TPayload, Env>
+): SchedulerDefinition<TPayload, Env> => definition;
+
 export interface QueryContext extends AppflareAuthContext {
 	db: DatabaseReader;
+	scheduler?: Scheduler;
 }
 
 export interface InternalQueryContext {
 	db: DatabaseReader;
+	scheduler?: Scheduler;
 }
 
 export type QueryArgsShape = Record<string, AnyValidator>;
@@ -240,6 +269,7 @@ export interface DatabaseWriter extends DatabaseReader {}
 
 export interface MutationContext extends AppflareAuthContext {
 	db: DatabaseWriter;
+	scheduler?: Scheduler;
 }
 
 export interface MutationDefinition<TArgs extends QueryArgsShape, TResult> {
@@ -256,6 +286,7 @@ export const mutation = <TArgs extends QueryArgsShape, TResult>(
 
 export interface InternalMutationContext {
 	db: DatabaseWriter;
+	scheduler?: Scheduler;
 }
 
 export interface InternalQueryDefinition<

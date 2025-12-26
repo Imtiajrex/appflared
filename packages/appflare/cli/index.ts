@@ -11,6 +11,7 @@ import {
 	generateDbHandlers,
 	generateHonoServer,
 	generateWebsocketDurableObject,
+	generateSchedulerHandlers,
 } from "./core/handlers";
 import {
 	generateCloudflareWorkerIndex,
@@ -182,6 +183,17 @@ async function buildFromConfig(params: {
 	await fs.writeFile(
 		path.join(outDirAbs, "server", "websocket-hibernation-server.ts"),
 		websocketDoTs
+	);
+
+	const schedulerTs = generateSchedulerHandlers({
+		handlers,
+		outDirAbs,
+		schemaPathAbs,
+		configPathAbs,
+	});
+	await fs.writeFile(
+		path.join(outDirAbs, "server", "scheduler.ts"),
+		schedulerTs
 	);
 
 	const allowedOrigins = normalizeAllowedOrigins(

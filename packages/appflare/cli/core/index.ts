@@ -10,6 +10,7 @@ import {
 	generateDbHandlers,
 	generateHonoServer,
 	generateWebsocketDurableObject,
+	generateSchedulerHandlers,
 } from "./handlers";
 import { generateSchemaTypes, getSchemaTableNames } from "../schema/schema";
 import { runTscEmit, writeEmitTsconfig } from "../utils/tsc";
@@ -155,6 +156,17 @@ async function buildFromConfig(params: {
 	await fs.writeFile(
 		path.join(outDirAbs, "server", "websocket-hibernation-server.ts"),
 		websocketDoTs
+	);
+
+	const schedulerTs = generateSchedulerHandlers({
+		handlers,
+		outDirAbs,
+		schemaPathAbs,
+		configPathAbs,
+	});
+	await fs.writeFile(
+		path.join(outDirAbs, "server", "scheduler.ts"),
+		schedulerTs
 	);
 
 	if (emit) {

@@ -1,8 +1,10 @@
 import type { AppflareConfig } from "../../utils/utils";
 import {
+	DEFAULT_SCHEDULER_QUEUE_BINDING,
 	resolveAllowedOrigins,
 	sanitizeWorkerName,
 	toBucketName,
+	toQueueName,
 } from "./helpers";
 
 export function generateWranglerJson(params: {
@@ -21,6 +23,13 @@ export function generateWranglerJson(params: {
 				},
 			]
 		: undefined;
+
+	const schedulerEnabled = params.config.scheduler?.enabled !== false;
+	const schedulerQueueBinding =
+		params.config.scheduler?.queueBinding ?? DEFAULT_SCHEDULER_QUEUE_BINDING;
+	const schedulerQueueName = params.config.scheduler?.queueName
+		? toQueueName(params.config.scheduler.queueName)
+		: `${toQueueName(sanitizeWorkerName(params.configDirAbs))}-scheduler`;
 
 	const wrangler: Record<string, unknown> = {
 		$schema: "node_modules/wrangler/config-schema.json",
@@ -53,6 +62,22 @@ export function generateWranglerJson(params: {
 
 	if (r2Buckets && r2Buckets.length > 0) {
 		wrangler.r2_buckets = r2Buckets;
+	}
+
+	if (schedulerEnabled) {
+		wrangler.queues = {
+			producers: [
+				{
+					binding: schedulerQueueBinding,
+					queue: schedulerQueueName,
+				},
+			],
+			consumers: [
+				{
+					queue: schedulerQueueName,
+				},
+			],
+		};
 	}
 
 	return `${JSON.stringify(wrangler, null, 2)}\n`;

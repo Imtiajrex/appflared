@@ -41,4 +41,17 @@
 			"bucket_name": "appflare-storage",
 		},
 	],
+	"queues": {
+		"producers": [
+			{
+				"binding": "APPFLARE_SCHEDULER_QUEUE",
+				"queue": "appflare-config-scheduler",
+			},
+		],
+		"consumers": [
+			{
+				"queue": "appflare-config-scheduler",
+			},
+		],
+	},
 }

@@ -1,6 +1,11 @@
 import { z } from "zod";
-import { internalQuery, mutation, query } from "./_generated/src/schema-types";
-import { runInternalMutation } from "./_generated/src/api";
+import {
+	internalQuery,
+	mutation,
+	query,
+	scheduler,
+} from "./_generated/src/schema-types";
+import { internal, runInternalMutation } from "./_generated/src/api";
 export const getUsers = query({
 	args: {
 		id: z.string().optional(),
@@ -19,7 +24,36 @@ export const getUsers = query({
 			include: { roombas: true, tickets: true },
 		});
 
+		await ctx.scheduler?.enqueue("user/testSchedule", {
+			userId: ctx.user.id,
+		});
+
 		return users;
+	},
+});
+export const testSchedule = scheduler({
+	handler: async (ctx, payload) => {
+		console.log(payload);
+		await ctx.db.users.update({
+			where: { _id: "694e5166a780c80869606347" },
+			data: { name: `Scheduled Update ${new Date().toISOString()}` },
+		});
+	},
+});
+
+// Test scheduler + enqueue helper to verify queue wiring.
+export const enqueueTestSchedule = mutation({
+	args: {
+		userId: z.string().optional(),
+		delaySeconds: z.number().int().nonnegative().optional(),
+	},
+	handler: async (ctx, args) => {
+		await ctx.scheduler?.enqueue(
+			"user/testSchedule",
+			{ userId: args.userId ?? ctx.user?.id ?? null },
+			args.delaySeconds ? { delaySeconds: args.delaySeconds } : undefined
+		);
+		return { enqueued: true };
 	},
 });
 export const getUserData = query({
