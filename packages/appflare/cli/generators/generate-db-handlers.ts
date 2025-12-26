@@ -35,15 +35,15 @@ export async function generateDbHandlers(params: {
  */
 import { z } from "zod";
 import {
-	mutation,
-	query,
+	internalMutation,
+	internalQuery,
 	type EditableDoc,
 	type Id,
 	type QuerySort,
 	type QueryWhere,
 } from "../schema-types";
 
-export const ${findFn} = query({
+export const ${findFn} = internalQuery({
 	args: {
 		where: z.custom<QueryWhere<${JSON.stringify(tableName)}>>().optional(),
 		sort: z.custom<QuerySort<${JSON.stringify(tableName)}>>().optional(),
@@ -60,7 +60,7 @@ export const ${findFn} = query({
 	},
 });
 
-export const ${findOneFn} = query({
+export const ${findOneFn} = internalQuery({
 	args: {
 		where: z.custom<QueryWhere<${JSON.stringify(tableName)}>>().optional(),
 		sort: z.custom<QuerySort<${JSON.stringify(tableName)}>>().optional(),
@@ -76,7 +76,7 @@ export const ${findOneFn} = query({
 	},
 });
 
-export const ${insertFn} = mutation({
+export const ${insertFn} = internalMutation({
 	args: {
 		value: z.custom<EditableDoc<${JSON.stringify(tableName)}>>(),
 	},
@@ -87,7 +87,7 @@ export const ${insertFn} = mutation({
 	},
 });
 
-export const ${updateFn} = mutation({
+export const ${updateFn} = internalMutation({
 	args: {
 		id: z.custom<Id<${JSON.stringify(tableName)}>>().optional(),
 		where: z.custom<QueryWhere<${JSON.stringify(tableName)}>>().optional(),
@@ -105,7 +105,7 @@ export const ${updateFn} = mutation({
 	},
 });
 
-export const ${deleteFn} = mutation({
+export const ${deleteFn} = internalMutation({
 	args: {
 		id: z.custom<Id<${JSON.stringify(tableName)}>>().optional(),
 		where: z.custom<QueryWhere<${JSON.stringify(tableName)}>>().optional(),

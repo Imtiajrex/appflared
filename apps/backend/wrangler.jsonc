@@ -1,7 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "appflare-config",
-	"main": "./server/index.ts",
+	"main": "./src/index.ts",
 	"compatibility_date": "2025-12-26",
 	"compatibility_flags": ["nodejs_compat", "nodejs_compat_populate_process_env"],
 	"migrations": [

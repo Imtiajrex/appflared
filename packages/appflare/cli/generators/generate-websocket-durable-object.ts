@@ -3,20 +3,30 @@ import {
 	groupBy,
 	pascalCase,
 	toImportPathFromGeneratedServer,
+	AppflareConfig,
 } from "../utils/utils";
 
 export function generateWebsocketDurableObject(params: {
 	handlers: DiscoveredHandler[];
 	outDirAbs: string;
 	schemaPathAbs: string;
+	configPathAbs: string;
+	config: AppflareConfig;
 }): string {
 	const queries = params.handlers.filter((h) => h.kind === "query");
 	const schemaImportPath = toImportPathFromGeneratedServer(
 		params.outDirAbs,
 		params.schemaPathAbs
 	);
+	const configImportPath = toImportPathFromGeneratedServer(
+		params.outDirAbs,
+		params.configPathAbs
+	);
 	const schemaTypesImportPath = "../src/schema-types";
 	const serverImportPath = "./server";
+	const hasAuth = !!(
+		params.config.auth && params.config.auth.enabled !== false
+	);
 
 	const localNameFor = (h: DiscoveredHandler): string =>
 		`__appflare_${pascalCase(h.fileName)}_${h.name}`;
@@ -36,6 +46,22 @@ export function generateWebsocketDurableObject(params: {
 			`import { ${specifiers.join(", ")} } from ${JSON.stringify(importPath)};`
 		);
 	}
+
+	const authImportLine = hasAuth
+		? 'import { initBetterAuth } from "appflare/server/auth";'
+		: "";
+
+	const authSetupBlock = hasAuth
+		? [
+				"const __appflareAuthConfig = (appflareConfig as any).auth;",
+				"const __appflareAuth =",
+				"\t__appflareAuthConfig &&",
+				"\t__appflareAuthConfig.enabled !== false &&",
+				"\t__appflareAuthConfig.options",
+				"\t\t? initBetterAuth(__appflareAuthConfig.options as any)",
+				"\t\t: undefined;",
+			].join("\n")
+		: "const __appflareAuth = undefined;";
 
 	const queryHandlerEntries = queries
 		.slice()
@@ -63,14 +89,47 @@ import {
 	type AppflareDbContext,
 	type AppflareServerContext,
 } from ${JSON.stringify(serverImportPath)};
+	import appflareConfig from ${JSON.stringify(configImportPath)};
 import schema from ${JSON.stringify(schemaImportPath)};
 import type {
 	QueryWhere,
 	QuerySort,
 	TableNames,
-} from ${JSON.stringify(schemaTypesImportPath)};
+		AppflareAuthContext,
+		AppflareAuthSession,
+		AppflareAuthUser,
+	} from ${JSON.stringify(schemaTypesImportPath)};
 import { MongoClient } from "mongodb";
-${importLines.join("\n")}
+	${authImportLine ? `${authImportLine}\n` : ""}${importLines.join("\n")}
+
+
+	const emptyAuthContext: AppflareAuthContext = {
+		session: null as AppflareAuthSession,
+		user: null as AppflareAuthUser,
+	};
+
+	const resolveAuthContextFromToken = async (
+		authToken?: string | null
+	): Promise<AppflareAuthContext> => {
+		${authSetupBlock}
+		if (!__appflareAuth || !authToken) return emptyAuthContext;
+		try {
+			const request = new Request("http://appflare-internal/auth", {
+				headers: { Authorization: \`Bearer \${authToken}\` },
+			});
+			const sessionResult = await __appflareAuth.api.getSession(request);
+			return {
+				session:
+					(sessionResult as any)?.session ??
+					(sessionResult as any) ??
+					(null as AppflareAuthSession),
+				user: (sessionResult as any)?.user ?? (null as AppflareAuthUser),
+			};
+		} catch (err) {
+			console.error("Appflare websocket auth failed", err);
+			return emptyAuthContext;
+		}
+	};
 
 type SubscriptionQueryHandler = { file: string; name: string };
 
@@ -84,7 +143,11 @@ type Subscription = {
 	skip?: number;
 	select?: unknown;
 	include?: unknown;
+		authToken?: string | null;
+		auth?: AppflareAuthContext;
 };
+
+type SubscriptionWithAuth = Subscription & { auth?: AppflareAuthContext };
 
 type ParsedSubscription =
 	| { ok: true; value: Subscription }
@@ -160,7 +223,7 @@ export type MutationNotification = {
 };
 
 export class WebSocketHibernationServer extends DurableObject {
-	private subscriptions: Map<WebSocket, Subscription>;
+	private subscriptions: Map<WebSocket, SubscriptionWithAuth>;
 	private db: AppflareDbContext | null;
 
 	constructor(ctx: DurableObjectState, env: any) {
@@ -170,7 +233,9 @@ export class WebSocketHibernationServer extends DurableObject {
 		this.db = null;
 
 		for (const socket of this.ctx.getWebSockets()) {
-			const restored = socket.deserializeAttachment() as Subscription | undefined;
+			const restored = socket.deserializeAttachment() as
+				| SubscriptionWithAuth
+				| undefined;
 			if (restored) {
 				this.subscriptions.set(socket, restored);
 			}
@@ -179,6 +244,17 @@ export class WebSocketHibernationServer extends DurableObject {
 		this.ctx.setWebSocketAutoResponse(
 			new WebSocketRequestResponsePair("ping", "pong")
 		);
+	}
+
+	private async withAuth(
+		sub: Subscription
+	): Promise<SubscriptionWithAuth> {
+		if (!sub.authToken) return sub as SubscriptionWithAuth;
+		if (sub.auth && sub.auth.session !== undefined) {
+			return sub as SubscriptionWithAuth;
+		}
+		const auth = await resolveAuthContextFromToken(sub.authToken);
+		return { ...sub, auth } as SubscriptionWithAuth;
 	}
 
 	async fetch(request: Request): Promise<Response> {
@@ -222,21 +298,22 @@ export class WebSocketHibernationServer extends DurableObject {
 	}
 
 	private async handleSubscribe(sub: Subscription): Promise<Response> {
+		const subWithAuth = await this.withAuth(sub);
 		const { 0: client, 1: server } = Object.values(new WebSocketPair());
-		server.serializeAttachment(sub);
+		server.serializeAttachment(subWithAuth);
 		this.ctx.acceptWebSocket(server);
-		this.subscriptions.set(server, sub);
+		this.subscriptions.set(server, subWithAuth);
 		server.send(
-			JSON.stringify({ type: "subscribed", subscription: sub })
+			JSON.stringify({ type: "subscribed", subscription: subWithAuth })
 		);
 
 		try {
-			const data = await this.fetchData(sub);
+			const data = await this.fetchData(subWithAuth);
 			server.send(
 				JSON.stringify({
 					type: "data",
-					table: sub.table,
-					where: sub.where,
+					table: subWithAuth.table,
+					where: subWithAuth.where,
 					data,
 				})
 			);
@@ -252,6 +329,7 @@ export class WebSocketHibernationServer extends DurableObject {
 		if (!table) {
 			return { ok: false, error: "Missing or invalid table param" };
 		}
+		const authToken = params.get("authToken");
 
 		const parseJson = <T>(key: string): T | undefined => {
 			const raw = params.get(key);
@@ -298,6 +376,7 @@ export class WebSocketHibernationServer extends DurableObject {
 				include,
 				take: takeStr ? Number(takeStr) : undefined,
 				skip: skipStr ? Number(skipStr) : undefined,
+				authToken,
 			},
 		};
 	}
@@ -457,25 +536,26 @@ export class WebSocketHibernationServer extends DurableObject {
 	}
 
 	private async fetchData(sub: Subscription): Promise<unknown> {
-		const query = resolveQueryHandler(sub.handler);
+		const subWithAuth = await this.withAuth(sub);
+		const query = resolveQueryHandler(subWithAuth.handler);
 		if (query) {
-			const ctx = this.createHandlerContext();
-			const parsedArgs = this.parseHandlerArgs(query, sub.where);
+			const ctx = this.createHandlerContext(subWithAuth.auth);
+			const parsedArgs = this.parseHandlerArgs(query, subWithAuth.where);
 			return await query.handler(ctx, parsedArgs);
 		}
 
 		const db = this.getDb();
-		const table = db[sub.table] as any;
+		const table = db[subWithAuth.table] as any;
 		if (!table || typeof table.findMany !== "function") {
-			throw new Error("Unknown table: " + sub.table);
+			throw new Error("Unknown table: " + subWithAuth.table);
 		}
 		const data = await table.findMany({
-			where: sub.where as any,
-			orderBy: sub.orderBy as any,
-			skip: sub.skip,
-			take: sub.take,
-			select: sub.select as any,
-			include: sub.include as any,
+			where: subWithAuth.where as any,
+			orderBy: subWithAuth.orderBy as any,
+			skip: subWithAuth.skip,
+			take: subWithAuth.take,
+			select: subWithAuth.select as any,
+			include: subWithAuth.include as any,
 		});
 		return data ?? [];
 	}
@@ -497,11 +577,11 @@ export class WebSocketHibernationServer extends DurableObject {
 		return args ?? {};
 	}
 
-	private createHandlerContext(): AppflareServerContext {
+	private createHandlerContext(auth?: AppflareAuthContext): AppflareServerContext {
 		return {
 			db: this.getDb(),
-			session: null,
-			user: null,
+			session: auth?.session ?? null,
+			user: auth?.user ?? null,
 		} as AppflareServerContext;
 	}
 

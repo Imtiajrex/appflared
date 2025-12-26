@@ -28,7 +28,11 @@ export type AppflareConfig<
 	storage?: AppflareStorageConfig;
 };
 
-export type HandlerKind = "query" | "mutation";
+export type HandlerKind =
+	| "query"
+	| "mutation"
+	| "internalQuery"
+	| "internalMutation";
 
 export type DiscoveredHandler = {
 	fileName: string;

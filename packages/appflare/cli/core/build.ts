@@ -80,6 +80,8 @@ export async function buildFromConfig(params: {
 		handlers,
 		outDirAbs,
 		schemaPathAbs,
+		configPathAbs,
+		config,
 	});
 	await fs.writeFile(
 		path.join(outDirAbs, "server", "websocket-hibernation-server.ts"),

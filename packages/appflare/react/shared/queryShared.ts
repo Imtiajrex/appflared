@@ -19,8 +19,13 @@ export type HandlerWebsocketOptions<TResult> = {
 	skip?: number;
 	path?: string;
 	protocols?: string | string[];
+	headers?: Record<string, string>;
 	signal?: AbortSignal;
-	websocketImpl?: (url: string, protocols?: string | string[]) => WebSocket;
+	websocketImpl?: (
+		url: string,
+		protocols?: string | string[],
+		options?: { headers?: Record<string, string> }
+	) => WebSocket;
 	onOpen?: (event: any) => void;
 	onClose?: (event: any) => void;
 	onError?: (event: any) => void;

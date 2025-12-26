@@ -57,3 +57,23 @@ export function generateMutationsTypeLines(
 		})
 		.join("\n");
 }
+
+export function generateInternalTypeLines(
+	internalByFile: Map<string, DiscoveredHandler[]>,
+	importAliasBySource: Map<string, string>
+): string {
+	return sortedEntries(internalByFile)
+		.map(([fileName, list]) => {
+			const fileKey = renderObjectKey(fileName);
+			const inner = list
+				.slice()
+				.sort((a, b) => a.name.localeCompare(b.name))
+				.map((h) => {
+					const alias = importAliasBySource.get(h.sourceFileAbs)!;
+					return `\t\t${h.name}: typeof ${alias}[${JSON.stringify(h.name)}];`;
+				})
+				.join("\n");
+			return `\t${fileKey}: {\n${inner || "\t\t// (none)"}\n\t};`;
+		})
+		.join("\n");
+}

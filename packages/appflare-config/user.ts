@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { mutation, query } from "./_generated/src/schema-types";
+import { internalQuery, mutation, query } from "./_generated/src/schema-types";
+import { runInternalMutation } from "./_generated/src/api";
 export const getUsers = query({
 	args: {
 		id: z.string().optional(),
@@ -9,6 +10,9 @@ export const getUsers = query({
 		const where: Record<string, string | undefined> = {};
 		if (args.name) where.name = args.name;
 		if (args.id) where._id = args.id;
+		if (!ctx.user) {
+			throw new Error("Unauthorized");
+		}
 
 		const users = ctx.db.users.findMany({
 			where,
@@ -32,11 +36,23 @@ export const getAllUsers = query({
 		return users;
 	},
 });
+export const getInternalUserCount = internalQuery({
+	args: {
+		test: z.string().optional(),
+	},
+	handler: async (ctx, args) => {
+		const count = await ctx.db.users.count({});
+		return count;
+	},
+});
 export const createUser = mutation({
 	args: {
 		name: z.string(),
 	},
 	handler: async (ctx, args) => {
+		const count = await runInternalMutation(ctx, getInternalUserCount, {
+			test: "testing",
+		});
 		const User = await ctx.db.users.create({
 			data: {
 				name: args.name,
@@ -44,7 +60,6 @@ export const createUser = mutation({
 				tickets: [],
 			},
 		});
-
 		return User;
 	},
 });

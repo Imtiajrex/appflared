@@ -30,7 +30,7 @@ export async function discoverHandlers(params: {
 
 		const content = await fs.readFile(fileAbs, "utf8");
 		const regex =
-			/export\s+const\s+([A-Za-z_$][\w$]*)\s*=\s*(query|mutation)\s*\(/g;
+			/export\s+const\s+([A-Za-z_$][\w$]*)\s*=\s*(query|mutation|internalQuery|internalMutation)\s*\(/g;
 		let match: RegExpExecArray | null;
 		while ((match = regex.exec(content)) !== null) {
 			handlers.push({

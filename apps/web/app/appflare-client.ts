@@ -30,9 +30,6 @@ const setStoredAuthToken = (token: string | null) => {
 	localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
 };
 
-const ENV_AUTH_TOKEN = process.env.NEXT_PUBLIC_APPFLARE_AUTH_TOKEN;
-if (ENV_AUTH_TOKEN) setStoredAuthToken(ENV_AUTH_TOKEN);
-
 const withAuthHeaders = (init?: RequestInit): RequestInit => {
 	const headers = new Headers(init?.headers ?? {});
 	const authToken = getStoredAuthToken();
@@ -40,11 +37,26 @@ const withAuthHeaders = (init?: RequestInit): RequestInit => {
 	return { ...(init ?? {}), headers };
 };
 
+const withAuthRealtimeUrl = (url: string): string => {
+	const token = getStoredAuthToken();
+	if (!token) return url;
+	try {
+		const parsed = new URL(url);
+		parsed.searchParams.set("authToken", token);
+		return parsed.toString();
+	} catch {
+		const separator = url.includes("?") ? "&" : "?";
+		return `${url}${separator}authToken=${encodeURIComponent(token)}`;
+	}
+};
+
 export const api = createAppflareApi({
 	baseUrl: BASE_URL,
 	fetcher: (input, init) => fetch(input, withAuthHeaders(init)),
 	realtime: {
 		baseUrl: REALTIME_URL,
+		websocketImpl: (url, protocols) =>
+			new WebSocket(withAuthRealtimeUrl(url), protocols),
 	},
 	auth: {
 		baseURL: AUTH_URL,

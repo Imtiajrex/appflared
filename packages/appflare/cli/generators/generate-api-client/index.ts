@@ -12,7 +12,9 @@ import {
 	generateMutationsTypeLines,
 	generateQueriesTypeLines,
 	generateTypeBlocks,
+	generateInternalTypeLines,
 } from "./types";
+import { renderObjectKey } from "./utils";
 
 const HEADER_TEMPLATE = `/* eslint-disable */
 /**
@@ -31,6 +33,10 @@ import type {
 	MutationDefinition,
 	QueryArgsShape,
 	QueryDefinition,
+	InternalMutationContext,
+	InternalMutationDefinition,
+	InternalQueryContext,
+	InternalQueryDefinition,
 } from "./schema-types";
 
 `;
@@ -79,7 +85,15 @@ type HandlerSchema<THandler extends AnyHandlerDefinition> = HandlerSchemaFromSha
 	HandlerArgsShape<THandler>
 >;
 
-type WebSocketFactory = (url: string, protocols?: string | string[]) => WebSocket;
+type WebSocketHeaders = Record<string, string>;
+
+type WebSocketFactoryOptions = { headers?: WebSocketHeaders };
+
+type WebSocketFactory = (
+	url: string,
+	protocols?: string | string[],
+	options?: WebSocketFactoryOptions
+) => WebSocket;
 
 export type RealtimeMessage<TResult> = {
 	type?: string;
@@ -101,6 +115,7 @@ export type HandlerWebsocketOptions<TResult> = {
 	skip?: number;
 	path?: string;
 	protocols?: string | string[];
+	headers?: WebSocketHeaders;
 	signal?: AbortSignal;
 	websocketImpl?: WebSocketFactory;
 	onOpen?: (event: any) => void;
@@ -170,7 +185,11 @@ type RequestExecutor = (
 
 const defaultFetcher: RequestExecutor = (input, init) => fetch(input, init);
 
-const defaultWebSocketFactory: WebSocketFactory = (url, protocols) => {
+const defaultWebSocketFactory: WebSocketFactory = (
+	url,
+	protocols,
+	_options
+) => {
 	if (typeof WebSocket === "undefined") {
 		throw new Error(
 			"WebSocket is not available in this environment. Provide options.realtime.websocketImpl to create websockets."
@@ -182,15 +201,84 @@ const defaultWebSocketFactory: WebSocketFactory = (url, protocols) => {
 type ResolvedRealtimeConfig = {
 	baseUrl?: string;
 	path: string;
+	headers?: WebSocketHeaders;
 	websocketImpl?: WebSocketFactory;
 };
 
 type RealtimeConfig = {
 	baseUrl?: string;
 	path?: string;
+	headers?: WebSocketHeaders;
 	websocketImpl?: WebSocketFactory;
 };
 
+`;
+
+const INTERNAL_TEMPLATE = `
+export type InternalQueries = {{internalQueriesTypeDef}};
+
+export type InternalMutations = {{internalMutationsTypeDef}};
+
+export type InternalHandlers = InternalQueries & InternalMutations;
+
+export const internal: InternalHandlers = {{internalInit}};
+
+const __internalQueries = [
+{{internalQueriesMeta}}
+];
+
+const __internalMutations = [
+{{internalMutationsMeta}}
+];
+
+type BoundInternalHandlers = {
+	[F in keyof InternalHandlers]: {
+		[N in keyof InternalHandlers[F]]: InternalHandlers[F][N] extends InternalQueryDefinition<
+			infer TArgs,
+			infer TResult
+		>
+			? (args: HandlerArgsFromShape<TArgs>) => Promise<TResult>
+			: InternalHandlers[F][N] extends InternalMutationDefinition<
+				infer TArgs,
+				infer TResult
+			>
+				? (args: HandlerArgsFromShape<TArgs>) => Promise<TResult>
+				: never;
+	};
+};
+
+export type InternalCaller = {
+	internal: BoundInternalHandlers;
+	runQuery: <TArgs extends QueryArgsShape, TResult>(
+		handler: InternalQueryDefinition<TArgs, TResult>,
+		args: HandlerArgsFromShape<TArgs>
+	) => Promise<TResult>;
+	runMutation: <TArgs extends QueryArgsShape, TResult>(
+		handler: InternalMutationDefinition<TArgs, TResult>,
+		args: HandlerArgsFromShape<TArgs>
+	) => Promise<TResult>;
+};
+
+export function createInternalCaller(
+	ctx: InternalQueryContext | InternalMutationContext
+): InternalCaller {
+	const bound: Record<string, Record<string, any>> = {};
+	for (const entry of __internalQueries) {
+		(bound[entry.file] ||= {})[entry.name] = (args: any) =>
+			runInternalQuery(ctx as any, entry.handler as any, args as any);
+	}
+	for (const entry of __internalMutations) {
+		(bound[entry.file] ||= {})[entry.name] = (args: any) =>
+			runInternalMutation(ctx as any, entry.handler as any, args as any);
+	}
+	return {
+		internal: bound as BoundInternalHandlers,
+		runQuery: (handler, args) =>
+			runInternalQuery(ctx as any, handler as any, args as any),
+		runMutation: (handler, args) =>
+			runInternalMutation(ctx as any, handler as any, args as any),
+	};
+}
 `;
 
 const CLIENT_TYPES_TEMPLATE = `
@@ -253,6 +341,7 @@ function resolveRealtimeConfig(
 	return {
 		baseUrl: normalizeWsBaseUrl(realtime?.baseUrl ?? baseUrl),
 		path: realtime?.path ?? "/ws",
+		headers: realtime?.headers,
 		websocketImpl: realtime?.websocketImpl ?? defaultWebSocketFactory,
 	};
 }
@@ -262,6 +351,39 @@ function createHandlerSchema<TArgs extends QueryArgsShape>(
 ): HandlerSchemaFromShape<TArgs> {
 	return z.object(args as any as Record<string, z.ZodTypeAny>) as HandlerSchemaFromShape<TArgs>;
 }
+
+function parseHandlerArgs<THandler extends AnyHandlerDefinition>(
+	handler: THandler,
+	args: HandlerArgs<THandler>
+): HandlerArgs<THandler> {
+	const schema = createHandlerSchema(handler.args as any);
+	return schema.parse(args ?? ({} as HandlerArgs<THandler>)) as HandlerArgs<THandler>;
+}
+
+export async function runInternalQuery<
+	TArgs extends QueryArgsShape,
+	TResult,
+>(
+	ctx: InternalQueryContext,
+	handler: InternalQueryDefinition<TArgs, TResult>,
+	args: HandlerArgsFromShape<TArgs>
+): Promise<TResult> {
+	const parsed = parseHandlerArgs(handler as any, args as any);
+	return handler.handler(ctx as any, parsed as any);
+}
+
+export async function runInternalMutation<
+	TArgs extends QueryArgsShape,
+	TResult,
+>(
+	ctx: InternalMutationContext,
+	handler: InternalMutationDefinition<TArgs, TResult>,
+	args: HandlerArgsFromShape<TArgs>
+): Promise<TResult> {
+	const parsed = parseHandlerArgs(handler as any, args as any);
+	return handler.handler(ctx as any, parsed as any);
+}
+
 `;
 
 const UTILITY_FUNCTIONS_TEMPLATE_PART2 = `
@@ -302,7 +424,9 @@ function createHandlerWebsocket<TArgs, TResult>(
 		const path = options?.path ?? realtime.path;
 		const url = buildRealtimeUrl(baseUrl, path, params);
 		const websocketFactory = options?.websocketImpl ?? realtime.websocketImpl ?? defaultWebSocketFactory;
-		const socket = websocketFactory(url, options?.protocols);
+		const socket = websocketFactory(url, options?.protocols, {
+			headers: options?.headers ?? realtime.headers,
+		});
 
 		if (options?.onOpen) socket.addEventListener("open", options.onOpen as any);
 		if (options?.onClose) socket.addEventListener("close", options.onClose as any);
@@ -552,29 +676,71 @@ function generateImports(params: {
 function generateGroupedHandlers(handlers: DiscoveredHandler[]): {
 	queriesByFile: Map<string, DiscoveredHandler[]>;
 	mutationsByFile: Map<string, DiscoveredHandler[]>;
+	internalQueriesByFile: Map<string, DiscoveredHandler[]>;
+	internalMutationsByFile: Map<string, DiscoveredHandler[]>;
 } {
 	const queries = handlers.filter((h) => h.kind === "query");
 	const mutations = handlers.filter((h) => h.kind === "mutation");
+	const internalQueries = handlers.filter((h) => h.kind === "internalQuery");
+	const internalMutations = handlers.filter(
+		(h) => h.kind === "internalMutation"
+	);
 
 	const queriesByFile = groupBy(queries, (h) => h.fileName);
 	const mutationsByFile = groupBy(mutations, (h) => h.fileName);
+	const internalQueriesByFile = groupBy(internalQueries, (h) => h.fileName);
+	const internalMutationsByFile = groupBy(internalMutations, (h) => h.fileName);
 
-	return { queriesByFile, mutationsByFile };
+	return {
+		queriesByFile,
+		mutationsByFile,
+		internalQueriesByFile,
+		internalMutationsByFile,
+	};
 }
 
 function generateTypeDefs(
 	queriesByFile: Map<string, DiscoveredHandler[]>,
-	mutationsByFile: Map<string, DiscoveredHandler[]>
-): { queriesTypeDef: string; mutationsTypeDef: string } {
+	mutationsByFile: Map<string, DiscoveredHandler[]>,
+	internalQueriesByFile: Map<string, DiscoveredHandler[]>,
+	internalMutationsByFile: Map<string, DiscoveredHandler[]>,
+	importAliasBySource: Map<string, string>
+): {
+	queriesTypeDef: string;
+	mutationsTypeDef: string;
+	internalQueriesTypeDef: string;
+	internalMutationsTypeDef: string;
+} {
 	const queriesTypeLines = generateQueriesTypeLines(queriesByFile);
 	const mutationsTypeLines = generateMutationsTypeLines(mutationsByFile);
+	const internalQueriesTypeLines = generateInternalTypeLines(
+		internalQueriesByFile,
+		importAliasBySource
+	);
+	const internalMutationsTypeLines = generateInternalTypeLines(
+		internalMutationsByFile,
+		importAliasBySource
+	);
 
 	const queriesTypeDef =
 		queriesByFile.size === 0 ? "{}" : `{\n${queriesTypeLines}\n}`;
 	const mutationsTypeDef =
 		mutationsByFile.size === 0 ? "{}" : `{\n${mutationsTypeLines}\n}`;
+	const internalQueriesTypeDef =
+		internalQueriesByFile.size === 0
+			? "{}"
+			: `{\n${internalQueriesTypeLines}\n}`;
+	const internalMutationsTypeDef =
+		internalMutationsByFile.size === 0
+			? "{}"
+			: `{\n${internalMutationsTypeLines}\n}`;
 
-	return { queriesTypeDef, mutationsTypeDef };
+	return {
+		queriesTypeDef,
+		mutationsTypeDef,
+		internalQueriesTypeDef,
+		internalMutationsTypeDef,
+	};
 }
 
 function generateClientInits(
@@ -599,22 +765,99 @@ function generateClientInits(
 	return { queriesInit, mutationsInit };
 }
 
+function generateInternalInit(
+	internalByFile: Map<string, DiscoveredHandler[]>,
+	importAliasBySource: Map<string, string>
+): string {
+	if (internalByFile.size === 0) return "{}";
+	const lines: string[] = [];
+	for (const [fileName, list] of Array.from(internalByFile.entries()).sort(
+		(a, b) => a[0].localeCompare(b[0])
+	)) {
+		const fileKey = renderObjectKey(fileName);
+		const inner = list
+			.slice()
+			.sort((a, b) => a.name.localeCompare(b.name))
+			.map((h) => {
+				const alias = importAliasBySource.get(h.sourceFileAbs)!;
+				return `\t\t${h.name}: ${alias}.${h.name},`;
+			})
+			.join("\n");
+		lines.push(`\t${fileKey}: {\n${inner}\n\t}`);
+	}
+	return `{
+${lines.join("\n")}
+}`;
+}
+
+function generateInternalMeta(
+	internalByFile: Map<string, DiscoveredHandler[]>,
+	importAliasBySource: Map<string, string>
+): string {
+	if (internalByFile.size === 0) return "";
+	const lines: string[] = [];
+	for (const [fileName, list] of Array.from(internalByFile.entries()).sort(
+		(a, b) => a[0].localeCompare(b[0])
+	)) {
+		for (const h of list.slice().sort((a, b) => a.name.localeCompare(b.name))) {
+			const alias = importAliasBySource.get(h.sourceFileAbs)!;
+			lines.push(
+				`{ file: ${JSON.stringify(fileName)}, name: ${JSON.stringify(
+					h.name
+				)}, handler: ${alias}.${h.name} },`
+			);
+		}
+	}
+	return lines.join("\n");
+}
+
 export function generateApiClient(params: {
 	handlers: DiscoveredHandler[];
 	outDirAbs: string;
 	authBasePath?: string;
 }): string {
 	const { importLines, importAliasBySource } = generateImports(params);
-	const { queriesByFile, mutationsByFile } = generateGroupedHandlers(
-		params.handlers
-	);
-	const { queriesTypeDef, mutationsTypeDef } = generateTypeDefs(
+	const {
 		queriesByFile,
-		mutationsByFile
+		mutationsByFile,
+		internalQueriesByFile,
+		internalMutationsByFile,
+	} = generateGroupedHandlers(params.handlers);
+	const {
+		queriesTypeDef,
+		mutationsTypeDef,
+		internalQueriesTypeDef,
+		internalMutationsTypeDef,
+	} = generateTypeDefs(
+		queriesByFile,
+		mutationsByFile,
+		internalQueriesByFile,
+		internalMutationsByFile,
+		importAliasBySource
 	);
 	const { queriesInit, mutationsInit } = generateClientInits(
 		queriesByFile,
 		mutationsByFile,
+		importAliasBySource
+	);
+	const internalHandlersCombined = new Map<string, DiscoveredHandler[]>();
+	for (const [file, list] of Array.from(internalQueriesByFile.entries())) {
+		internalHandlersCombined.set(file, list.slice());
+	}
+	for (const [file, list] of Array.from(internalMutationsByFile.entries())) {
+		const existing = internalHandlersCombined.get(file) ?? [];
+		internalHandlersCombined.set(file, existing.concat(list));
+	}
+	const internalInit = generateInternalInit(
+		internalHandlersCombined,
+		importAliasBySource
+	);
+	const internalQueriesMeta = generateInternalMeta(
+		internalQueriesByFile,
+		importAliasBySource
+	);
+	const internalMutationsMeta = generateInternalMeta(
+		internalMutationsByFile,
 		importAliasBySource
 	);
 
@@ -627,6 +870,14 @@ export function generateApiClient(params: {
 		importLines.join("\n") +
 		TYPE_DEFINITIONS_TEMPLATE +
 		typeBlocks.join("\n\n") +
+		INTERNAL_TEMPLATE.replace(
+			"{{internalQueriesTypeDef}}",
+			internalQueriesTypeDef
+		)
+			.replace("{{internalMutationsTypeDef}}", internalMutationsTypeDef)
+			.replace("{{internalInit}}", internalInit)
+			.replace("{{internalQueriesMeta}}", internalQueriesMeta)
+			.replace("{{internalMutationsMeta}}", internalMutationsMeta) +
 		CLIENT_TYPES_TEMPLATE.replace("{{queriesTypeDef}}", queriesTypeDef)
 			.replace("{{mutationsTypeDef}}", mutationsTypeDef)
 			.replace("{{queriesInit}}", queriesInit)

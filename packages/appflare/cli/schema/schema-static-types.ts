@@ -209,6 +209,10 @@ export interface QueryContext extends AppflareAuthContext {
 	db: DatabaseReader;
 }
 
+export interface InternalQueryContext {
+	db: DatabaseReader;
+}
+
 export type QueryArgsShape = Record<string, AnyValidator>;
 
 type InferValidator<TValidator> =
@@ -249,4 +253,38 @@ export interface MutationDefinition<TArgs extends QueryArgsShape, TResult> {
 export const mutation = <TArgs extends QueryArgsShape, TResult>(
 	definition: MutationDefinition<TArgs, TResult>
 ): MutationDefinition<TArgs, TResult> => definition;
+
+export interface InternalMutationContext {
+	db: DatabaseWriter;
+}
+
+export interface InternalQueryDefinition<
+	TArgs extends QueryArgsShape,
+	TResult,
+> {
+	args: TArgs;
+	handler: (
+		ctx: InternalQueryContext,
+		args: InferQueryArgs<TArgs>
+	) => Promise<TResult>;
+}
+
+export const internalQuery = <TArgs extends QueryArgsShape, TResult>(
+	definition: InternalQueryDefinition<TArgs, TResult>
+): InternalQueryDefinition<TArgs, TResult> => definition;
+
+export interface InternalMutationDefinition<
+	TArgs extends QueryArgsShape,
+	TResult,
+> {
+	args: TArgs;
+	handler: (
+		ctx: InternalMutationContext,
+		args: InferQueryArgs<TArgs>
+	) => Promise<TResult>;
+}
+
+export const internalMutation = <TArgs extends QueryArgsShape, TResult>(
+	definition: InternalMutationDefinition<TArgs, TResult>
+): InternalMutationDefinition<TArgs, TResult> => definition;
 `;
