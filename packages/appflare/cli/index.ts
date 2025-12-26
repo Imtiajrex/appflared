@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import chokidar, { FSWatcher } from "chokidar";
 import { Command } from "commander";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -30,6 +31,11 @@ type AppflareConfig = {
 	};
 };
 
+type WatchConfig = {
+	targets: string[];
+	ignored: string[];
+};
+
 const program = new Command();
 
 program.name("appflare").description("Appflare CLI").version("0.0.0");
@@ -45,22 +51,34 @@ program
 		"appflare.config.ts"
 	)
 	.option("--emit", "Also run tsc to emit JS + .d.ts into outDir/dist")
-	.action(async (options: { config: string; emit?: boolean }) => {
-		try {
-			const configPath = path.resolve(process.cwd(), options.config);
-			const { config, configDirAbs } = await loadConfig(configPath);
-			await buildFromConfig({
-				config,
-				configDirAbs,
-				configPathAbs: configPath,
-				emit: Boolean(options.emit),
-			});
-		} catch (err) {
-			const message = err instanceof Error ? err.message : String(err);
-			console.error(message);
-			process.exitCode = 1;
+	.option("-w, --watch", "Watch for changes and rebuild")
+	.action(
+		async (options: { config: string; emit?: boolean; watch?: boolean }) => {
+			try {
+				const configPath = path.resolve(process.cwd(), options.config);
+
+				if (options.watch) {
+					await watchAndBuild({
+						configPathAbs: configPath,
+						emit: Boolean(options.emit),
+					});
+					return;
+				}
+
+				const { config, configDirAbs } = await loadConfig(configPath);
+				await buildFromConfig({
+					config,
+					configDirAbs,
+					configPathAbs: configPath,
+					emit: Boolean(options.emit),
+				});
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				console.error(message);
+				process.exitCode = 1;
+			}
 		}
-	});
+	);
 
 void main();
 
@@ -191,6 +209,151 @@ async function buildFromConfig(params: {
 		});
 		await runTscEmit(emitTsconfigAbs);
 	}
+}
+
+async function watchAndBuild(params: {
+	configPathAbs: string;
+	emit: boolean;
+}): Promise<void> {
+	let watcher: FSWatcher | undefined;
+	let lastWatchConfig: WatchConfig | undefined;
+	let isBuilding = false;
+	let pendingBuild = false;
+	let closed = false;
+
+	const closeWatcher = async () => {
+		if (!watcher) return;
+		await watcher.close();
+		watcher = undefined;
+	};
+
+	const applyWatchConfig = async (config: WatchConfig) => {
+		const normalized = normalizeWatchConfig(config);
+		if (watchConfigsEqual(lastWatchConfig, normalized)) return;
+
+		await closeWatcher();
+		watcher = chokidar.watch(normalized.targets, {
+			ignored: normalized.ignored,
+			ignoreInitial: true,
+			persistent: true,
+		});
+
+		watcher.on("all", (_event, filePath) => {
+			const rel = path.relative(process.cwd(), filePath) || filePath;
+			console.log(`[appflare] change detected: ${rel}`);
+			scheduleBuild();
+		});
+
+		lastWatchConfig = normalized;
+		console.log(
+			`[appflare] watching ${normalized.targets.length} path(s) (ignoring ${normalized.ignored.length})`
+		);
+	};
+
+	const scheduleBuild = () => {
+		if (isBuilding) {
+			pendingBuild = true;
+			return;
+		}
+		void runBuild();
+	};
+
+	const runBuild = async () => {
+		isBuilding = true;
+		const startedAt = Date.now();
+		try {
+			const { config, configDirAbs } = await loadConfig(params.configPathAbs);
+			await applyWatchConfig(
+				computeWatchConfig({
+					config,
+					configDirAbs,
+					configPathAbs: params.configPathAbs,
+				})
+			);
+			console.log("[appflare] build started");
+			await buildFromConfig({
+				config,
+				configDirAbs,
+				configPathAbs: params.configPathAbs,
+				emit: params.emit,
+			});
+			const elapsed = Date.now() - startedAt;
+			console.log(`[appflare] build finished in ${elapsed}ms`);
+		} catch (err) {
+			const message =
+				err instanceof Error ? (err.stack ?? err.message) : String(err);
+			console.error(`[appflare] build failed: ${message}`);
+		} finally {
+			isBuilding = false;
+			if (pendingBuild && !closed) {
+				pendingBuild = false;
+				scheduleBuild();
+			}
+		}
+	};
+
+	const handleExit = async () => {
+		closed = true;
+		await closeWatcher();
+	};
+
+	process.once("SIGINT", handleExit);
+	process.once("SIGTERM", handleExit);
+
+	await runBuild();
+}
+
+function computeWatchConfig(params: {
+	config: AppflareConfig;
+	configDirAbs: string;
+	configPathAbs: string;
+}): WatchConfig {
+	const { config, configDirAbs, configPathAbs } = params;
+	const projectDirAbs = path.resolve(configDirAbs, config.dir);
+	const schemaPathAbs = path.resolve(configDirAbs, config.schema);
+	const outDirAbs = path.resolve(configDirAbs, config.outDir);
+
+	return {
+		targets: [projectDirAbs, schemaPathAbs, configPathAbs],
+		ignored: [
+			outDirAbs,
+			path.join(outDirAbs, "**"),
+			path.join(projectDirAbs, "node_modules/**"),
+			path.join(projectDirAbs, "dist/**"),
+			path.join(projectDirAbs, "build/**"),
+			"**/node_modules/**",
+			"**/.git/**",
+			"**/dist/**",
+			"**/build/**",
+		],
+	};
+}
+
+function normalizeWatchConfig(config: WatchConfig): WatchConfig {
+	const normalizeList = (list: string[]): string[] =>
+		[
+			...new Set(
+				list.map((item) => (hasGlob(item) ? item : path.resolve(item)))
+			),
+		].sort();
+
+	return {
+		targets: normalizeList(config.targets),
+		ignored: normalizeList(config.ignored),
+	};
+}
+
+function watchConfigsEqual(a?: WatchConfig, b?: WatchConfig): boolean {
+	if (!a || !b) return false;
+	return arraysEqual(a.targets, b.targets) && arraysEqual(a.ignored, b.ignored);
+}
+
+function arraysEqual(a: string[], b: string[]): boolean {
+	return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+function hasGlob(value: string): boolean {
+	return value.includes("*") || value.includes("?") || value.includes("[");
 }
 
 function normalizeAllowedOrigins(origins: string | string[]): string[] {

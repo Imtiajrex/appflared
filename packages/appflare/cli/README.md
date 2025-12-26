@@ -7,6 +7,7 @@ This folder contains the build toolchain that turns an Appflare project (schema 
 - **build**: entrypoint defined in [packages/appflare/cli/index.ts](packages/appflare/cli/index.ts). Generates all artifacts into the configured `outDir` and optionally emits compiled output.
   - `-c, --config <path>`: path to the config file (defaults to `appflare.config.ts`).
   - `--emit`: after generation, run `bunx tsc` with a temporary tsconfig to emit JS and .d.ts into `outDir/dist`.
+  - `-w, --watch`: keep the process alive, watch for file changes (excluding `outDir`/`node_modules`/build artifacts), and rerun the build. Recomputes watched paths when the config changes.
 
 ### Config shape
 

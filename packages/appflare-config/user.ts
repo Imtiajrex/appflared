@@ -24,6 +24,14 @@ export const getUserData = query({
 		return ctx.user;
 	},
 });
+export const getAllUsers = query({
+	args: {},
+	handler: async (ctx, args) => {
+		const users = ctx.db.users.findMany({});
+
+		return users;
+	},
+});
 export const createUser = mutation({
 	args: {
 		name: z.string(),
