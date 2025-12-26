@@ -182,6 +182,7 @@ export function generateWranglerJson(params: {
 			],
 		},
 		observability: { enabled: true },
+		placement: { mode: "smart" },
 		vars: {
 			ALLOWED_ORIGINS: allowedOrigins.join(","),
 		},
