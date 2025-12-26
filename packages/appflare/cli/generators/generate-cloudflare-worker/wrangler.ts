@@ -31,10 +31,12 @@ export function generateWranglerJson(params: {
 		? toQueueName(params.config.scheduler.queueName)
 		: `${toQueueName(sanitizeWorkerName(params.configDirAbs))}-scheduler`;
 
+	const workerMain = params.config.wranglerMain ?? "./server/index.ts";
+
 	const wrangler: Record<string, unknown> = {
 		$schema: "node_modules/wrangler/config-schema.json",
 		name: sanitizeWorkerName(params.configDirAbs),
-		main: "./server/index.ts",
+		main: workerMain,
 		compatibility_date: new Date().toISOString().slice(0, 10),
 		compatibility_flags: [
 			"nodejs_compat",

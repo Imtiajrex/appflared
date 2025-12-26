@@ -1,0 +1,64 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "appflare-config",
+  "main": "./src/index.ts",
+  "compatibility_date": "2025-12-26",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_compat_populate_process_env"
+  ],
+  "migrations": [
+    {
+      "new_sqlite_classes": [
+        "WebSocketHibernationServer"
+      ],
+      "tag": "v1"
+    },
+    {
+      "new_sqlite_classes": [
+        "MONGO_DURABLE_OBJECT"
+      ],
+      "tag": "v2"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "WebSocketHibernationServer",
+        "name": "WEBSOCKET_HIBERNATION_SERVER"
+      },
+      {
+        "class_name": "MONGO_DURABLE_OBJECT",
+        "name": "MONGO_DURABLE_OBJECT"
+      }
+    ]
+  },
+  "observability": {
+    "enabled": true
+  },
+  "placement": {
+    "mode": "smart"
+  },
+  "vars": {
+    "ALLOWED_ORIGINS": "http://localhost:3000"
+  },
+  "r2_buckets": [
+    {
+      "binding": "APPFLARE_STORAGE",
+      "bucket_name": "appflare-storage"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "APPFLARE_SCHEDULER_QUEUE",
+        "queue": "appflare-config-scheduler"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "appflare-config-scheduler"
+      }
+    ]
+  }
+}

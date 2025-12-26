@@ -31,6 +31,10 @@ export type AppflareConfig<
 	dir: string;
 	schema: string;
 	outDir: string;
+	/** Optional override for where wrangler.json is written. Resolved relative to the config file. */
+	wranglerOutPath?: string;
+	/** Optional override for wrangler.json main entrypoint. Defaults to ./server/index.ts in the generated worker. */
+	wranglerMain?: string;
 	/** Optional CORS whitelist for generated Worker entrypoint. */
 	corsOrigin?: string | string[];
 	auth?: AppflareAuthConfig<Options>;

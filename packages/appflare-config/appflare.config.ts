@@ -1,6 +1,7 @@
 import type { BetterAuthOptions } from "better-auth";
 import { bearer } from "better-auth/plugins";
 import type { StorageRule } from "appflare/server/storage";
+import type { AppflareConfig } from "appflare";
 
 const authOptions: Partial<BetterAuthOptions> = {
 	trustedOrigins: ["http://localhost:3000"],
@@ -87,4 +88,6 @@ export default {
 		basePath: "/api/auth",
 		options: authOptions,
 	},
-};
+	wranglerOutPath: "../../apps/backend/wrangler.json",
+	wranglerMain: "./src/index.ts",
+} as AppflareConfig;

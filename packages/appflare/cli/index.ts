@@ -25,6 +25,10 @@ type AppflareConfig = {
 	dir: string;
 	schema: string;
 	outDir: string;
+	/** Optional override for where wrangler.json is written. Resolved relative to the config file. */
+	wranglerOutPath?: string;
+	/** Optional override for wrangler.json main entrypoint. Defaults to ./server/index.ts in the generated worker. */
+	wranglerMain?: string;
 	corsOrigin?: string | string[];
 	auth?: {
 		enabled?: boolean;
@@ -108,6 +112,18 @@ async function loadConfig(
 	}
 	if (typeof config.outDir !== "string" || !config.outDir) {
 		throw new Error(`Invalid config.outDir in ${configPathAbs}`);
+	}
+	if (
+		config.wranglerOutPath !== undefined &&
+		(typeof config.wranglerOutPath !== "string" || !config.wranglerOutPath)
+	) {
+		throw new Error(`Invalid config.wranglerOutPath in ${configPathAbs}`);
+	}
+	if (
+		config.wranglerMain !== undefined &&
+		(typeof config.wranglerMain !== "string" || !config.wranglerMain)
+	) {
+		throw new Error(`Invalid config.wranglerMain in ${configPathAbs}`);
 	}
 	return { config: config as AppflareConfig, configDirAbs };
 }
@@ -209,7 +225,11 @@ async function buildFromConfig(params: {
 		configDirAbs,
 		allowedOrigins,
 	});
-	await fs.writeFile(path.join(outDirAbs, "wrangler.json"), wranglerJson);
+	const wranglerOutPath =
+		config.wranglerOutPath ?? path.join(config.outDir, "wrangler.json");
+	const wranglerOutAbs = path.resolve(configDirAbs, wranglerOutPath);
+	await fs.mkdir(path.dirname(wranglerOutAbs), { recursive: true });
+	await fs.writeFile(wranglerOutAbs, wranglerJson);
 
 	if (emit) {
 		// Remove previous emit output to avoid stale files lingering.

@@ -64,6 +64,10 @@ export const enqueueTestSchedule = mutation({
 			null,
 			args.delaySeconds ? { delaySeconds: args.delaySeconds } : undefined
 		);
+		await ctx.scheduler.enqueue("user/sendEmail", {
+			email: "rogersmith@gmail.com",
+			name: "Roger Smith",
+		});
 		return { enqueued: true };
 	},
 });
