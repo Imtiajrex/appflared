@@ -75,14 +75,70 @@ export type AppflareSelect<TDoc> =
 	| ReadonlyArray<Keys<TDoc>>
 	| Partial<Record<Keys<TDoc>, boolean>>;
 
+type PopulatedDocForKey<TDoc, TKey extends Keys<TDoc>> =
+	NonNil<PopulateValue<TDoc[TKey]>> extends Array<infer TItem>
+		? NonNil<TItem>
+		: NonNil<PopulateValue<TDoc[TKey]>>;
+
+type AggregateSpec<TDoc> = {
+	count?: boolean;
+	sum?: ReadonlyArray<NumericKeys<TDoc>>;
+	avg?: ReadonlyArray<NumericKeys<TDoc>>;
+};
+
+type AppflareIncludeRecord<TDoc> = {
+	[K in PopulatableKeys<TDoc>]?:
+		| boolean
+		| {
+			aggregate?: AggregateSpec<PopulatedDocForKey<TDoc, K>>;
+			includeDocs?: boolean;
+		};
+};
+
 export type AppflareInclude<TDoc> =
 	| ReadonlyArray<PopulatableKeys<TDoc>>
-	| Partial<Record<PopulatableKeys<TDoc>, boolean>>;
+	| AppflareIncludeRecord<TDoc>;
 
-type AppflareResultDoc<TDoc, TSelect, TInclude> = WithSelected<
-	WithPopulatedMany<TDoc, IncludedKeys<TDoc, TInclude>>,
-	SelectedKeys<TDoc, TSelect>
->;
+type ExtractAggregateSpec<T> = T extends { aggregate?: infer TSpec } ? TSpec : never;
+
+type AggregateResultFromSpec<TDoc, TSpec> = (TSpec extends { count: true }
+	? { count: number }
+	: {}) &
+	(TSpec extends { sum: infer TSum }
+		? TSum extends ReadonlyArray<infer K>
+			? { [P in Extract<K, NumericKeys<TDoc>> as \`sum_\${P}\`]: number }
+			: {}
+		: {}) &
+	(TSpec extends { avg: infer TAvg }
+		? TAvg extends ReadonlyArray<infer K>
+			? { [P in Extract<K, NumericKeys<TDoc>> as \`avg_\${P}\`]: number }
+			: {}
+		: {});
+
+type AggregateMapForInclude<TDoc, TInclude> = TInclude extends ReadonlyArray<any>
+	? {}
+	: {
+		[K in keyof TInclude as ExtractAggregateSpec<TInclude[K]> extends never
+			? never
+			: K]: AggregateResultFromSpec<
+			PopulatedDocForKey<TDoc, Extract<K, Keys<TDoc>>>,
+			ExtractAggregateSpec<TInclude[K]>
+		>;
+	};
+
+type WithAggregatesForInclude<TDoc, TInclude> = keyof AggregateMapForInclude<
+	TDoc,
+	TInclude
+> extends never
+	? {}
+	: { _aggregates: AggregateMapForInclude<TDoc, TInclude> };
+
+type AppflareResultDoc<TDoc, TSelect, TInclude> =
+	WithSelected<
+		WithPopulatedMany<TDoc, IncludedKeys<TDoc, TInclude>>,
+		SelectedKeys<TDoc, TSelect>
+	> &
+		WithAggregatesForInclude<TDoc, TInclude>;
 
 export type AppflareFindManyArgs<TableName extends TableNames> = {
 	where?: QueryWhere<TableName>;

@@ -16,18 +16,17 @@ export const getUsers = query({
 		const where: Record<string, string | undefined> = {};
 		if (args.name) where.name = args.name;
 		if (args.id) where._id = args.id;
-		if (!ctx.user) {
-			throw new Error("Unauthorized");
-		}
 
-		const users = ctx.db.users.findMany({
+		const users = await ctx.db.users.findMany({
 			where,
-			include: { roombas: true, tickets: true },
-		});
-
-		await ctx.scheduler?.enqueue("user/sendEmail", {
-			email: ctx.user.email,
-			name: ctx.user.name,
+			include: {
+				tickets: {
+					aggregate: {
+						avg: ["stock"],
+					},
+					includeDocs: false,
+				},
+			},
 		});
 
 		return users;

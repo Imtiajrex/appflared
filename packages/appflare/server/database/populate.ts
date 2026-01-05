@@ -7,11 +7,18 @@ export async function applyPopulate(params: {
 	docs: Array<Record<string, unknown>>;
 	currentTable: string;
 	populateKeys: string[];
+	aggregate?: Record<
+		string,
+		{ count?: boolean; sum?: string[]; avg?: string[] }
+	>;
+	includeDocs?: Record<string, boolean>;
 	selectedKeys: string[] | undefined;
 	refs: SchemaRefMap;
 	getCollection: (table: string) => Collection<Document>;
 }) {
 	const tableRefs = params.refs.get(params.currentTable) ?? new Map();
+	const aggregateConfig = params.aggregate ?? {};
+	const includeDocsConfig = params.includeDocs ?? {};
 
 	const ensureStringId = (val: unknown): string | null => {
 		if (!val) return null;
@@ -60,10 +67,53 @@ export async function applyPopulate(params: {
 		return byId;
 	};
 
+	const computeAggregates = (
+		value: unknown,
+		spec: { count?: boolean; sum?: string[]; avg?: string[] }
+	): Record<string, number> | null => {
+		const items = Array.isArray(value)
+			? value
+			: value === undefined || value === null
+				? []
+				: [value];
+
+		const out: Record<string, number> = {};
+		const numericSum = (field: string) => {
+			let total = 0;
+			let found = 0;
+			for (const item of items) {
+				if (!item || typeof item !== "object") continue;
+				const raw = (item as Record<string, unknown>)[field];
+				if (typeof raw === "number" || typeof raw === "bigint") {
+					total += Number(raw);
+					found += 1;
+				}
+			}
+			return { total, found };
+		};
+
+		if (spec.count) out.count = items.length;
+
+		for (const field of spec.sum ?? []) {
+			const { total, found } = numericSum(String(field));
+			if (found > 0) out[`sum_${String(field)}`] = total;
+		}
+
+		for (const field of spec.avg ?? []) {
+			const { total, found } = numericSum(String(field));
+			if (found > 0) out[`avg_${String(field)}`] = total / found;
+		}
+
+		return Object.keys(out).length ? out : null;
+	};
+
 	for (const key of params.populateKeys) {
 		const forwardTarget = tableRefs.get(key);
 		const backwardCandidates = reverseRefs.get(params.currentTable) ?? [];
 		const backward = backwardCandidates.find((c) => c.table === key);
+		const includeDocs = includeDocsConfig[key] ?? true;
+		let valueById: Map<string, Record<string, unknown>[]> | undefined;
+		let handled = false;
 
 		// Prefer forward populate via $lookup when the table carries the ref.
 		if (forwardTarget) {
@@ -94,33 +144,37 @@ export async function applyPopulate(params: {
 					.toArray()) as Array<Record<string, unknown>>;
 
 				const byId = buildLookupMap(populated);
+				valueById = byId;
+				handled = true;
 
-				for (const doc of params.docs) {
-					const docId = ensureStringId(doc._id);
-					if (!docId) continue;
-					const populatedDocs = byId.get(docId) ?? [];
-					const currentValue = doc[key];
+				if (includeDocs) {
+					for (const doc of params.docs) {
+						const docId = ensureStringId(doc._id);
+						if (!docId) continue;
+						const populatedDocs = byId.get(docId) ?? [];
+						const currentValue = doc[key];
 
-					if (Array.isArray(currentValue)) {
-						const byRelId = new Map<string, Record<string, unknown>>();
-						for (const rel of populatedDocs) {
-							const relId = ensureStringId(rel._id);
-							if (relId) byRelId.set(relId, rel);
+						if (Array.isArray(currentValue)) {
+							const byRelId = new Map<string, Record<string, unknown>>();
+							for (const rel of populatedDocs) {
+								const relId = ensureStringId(rel._id);
+								if (relId) byRelId.set(relId, rel);
+							}
+							doc[key] = currentValue
+								.map((v) => {
+									const relId = ensureStringId(v);
+									return relId ? (byRelId.get(relId) ?? null) : null;
+								})
+								.filter((v): v is Record<string, unknown> => Boolean(v));
+							continue;
 						}
-						doc[key] = currentValue
-							.map((v) => {
-								const relId = ensureStringId(v);
-								return relId ? (byRelId.get(relId) ?? null) : null;
-							})
-							.filter((v): v is Record<string, unknown> => Boolean(v));
-						continue;
-					}
 
-					const relId = ensureStringId(currentValue);
-					doc[key] = relId
-						? (populatedDocs.find((v) => ensureStringId(v._id) === relId) ??
-							currentValue)
-						: (populatedDocs[0] ?? currentValue);
+						const relId = ensureStringId(currentValue);
+						doc[key] = relId
+							? (populatedDocs.find((v) => ensureStringId(v._id) === relId) ??
+								currentValue)
+							: (populatedDocs[0] ?? currentValue);
+					}
 				}
 
 				continue;
@@ -144,16 +198,36 @@ export async function applyPopulate(params: {
 				},
 				{ $project: { _id: 1, __pop: 1 } },
 			];
-
 			const populated = (await coll
 				.aggregate(pipeline as any)
 				.toArray()) as Array<Record<string, unknown>>;
+			if (!handled && backward) {
+				const grouped = buildLookupMap(populated);
+				valueById = grouped;
 
-			const grouped = buildLookupMap(populated);
+				if (includeDocs) {
+					for (const doc of params.docs) {
+						const id = ensureStringId(doc._id);
+						if (!id) continue;
+						doc[key] = grouped.get(id) ?? [];
+					}
+				}
+			}
+		}
+
+		const aggregateSpec = aggregateConfig[key];
+		if (aggregateSpec) {
 			for (const doc of params.docs) {
-				const id = ensureStringId(doc._id);
-				if (!id) continue;
-				doc[key] = grouped.get(id) ?? [];
+				const docId = ensureStringId(doc._id);
+				if (!docId) continue;
+				const aggregateSource = valueById?.get(docId) ?? doc[key];
+				const aggregated = computeAggregates(aggregateSource, aggregateSpec);
+				if (!aggregated) continue;
+				const existing = (doc as any)._aggregates as
+					| Record<string, unknown>
+					| undefined;
+				const target = existing ?? ((doc as any)._aggregates = {});
+				target[key] = aggregated;
 			}
 		}
 	}

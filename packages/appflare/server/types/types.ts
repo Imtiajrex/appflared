@@ -35,12 +35,87 @@ export type AppflareSelect<TDoc> =
 	| ReadonlyArray<Keys<TDoc>>
 	| Partial<Record<Keys<TDoc>, boolean>>;
 
+type PopulatedDocForKey<
+	TDoc,
+	TTableDocMap extends Record<string, TableDocBase>,
+	TKey extends Keys<TDoc>,
+> =
+	NonNil<PopulateValue<TDoc[TKey], TTableDocMap>> extends Array<infer TItem>
+		? NonNil<TItem>
+		: NonNil<PopulateValue<TDoc[TKey], TTableDocMap>>;
+
+type AggregateSpec<TDoc> = {
+	count?: boolean;
+	sum?: ReadonlyArray<NumericKeys<TDoc>>;
+	avg?: ReadonlyArray<NumericKeys<TDoc>>;
+};
+
+type AggregateSpecForKey<
+	TDoc,
+	TTableDocMap extends Record<string, TableDocBase>,
+	TKey extends Keys<TDoc>,
+> = AggregateSpec<PopulatedDocForKey<TDoc, TTableDocMap, TKey>>;
+
+type AppflareIncludeRecord<
+	TDoc,
+	TTableDocMap extends Record<string, TableDocBase>,
+> = {
+	[K in PopulatableKeys<TDoc, TTableDocMap>]?:
+		| boolean
+		| {
+				aggregate?: AggregateSpecForKey<TDoc, TTableDocMap, K>;
+				includeDocs?: boolean;
+		  };
+};
+
 export type AppflareInclude<
 	TDoc,
 	TTableDocMap extends Record<string, TableDocBase>,
 > =
 	| ReadonlyArray<PopulatableKeys<TDoc, TTableDocMap>>
-	| Partial<Record<PopulatableKeys<TDoc, TTableDocMap>, boolean>>;
+	| AppflareIncludeRecord<TDoc, TTableDocMap>;
+
+type ExtractAggregateSpec<T> = T extends { aggregate?: infer TSpec }
+	? TSpec
+	: never;
+
+type AggregateResultFromSpec<TDoc, TSpec> = (TSpec extends { count: true }
+	? { count: number }
+	: {}) &
+	(TSpec extends { sum: infer TSum }
+		? TSum extends ReadonlyArray<infer K>
+			? { [P in Extract<K, NumericKeys<TDoc>> as `sum_${P}`]: number }
+			: {}
+		: {}) &
+	(TSpec extends { avg: infer TAvg }
+		? TAvg extends ReadonlyArray<infer K>
+			? { [P in Extract<K, NumericKeys<TDoc>> as `avg_${P}`]: number }
+			: {}
+		: {});
+
+type AggregateMapForInclude<
+	TDoc,
+	TTableDocMap extends Record<string, TableDocBase>,
+	TInclude,
+> =
+	TInclude extends ReadonlyArray<any>
+		? {}
+		: {
+				[K in keyof TInclude as ExtractAggregateSpec<TInclude[K]> extends never
+					? never
+					: K]: AggregateResultFromSpec<
+					PopulatedDocForKey<TDoc, TTableDocMap, Extract<K, Keys<TDoc>>>,
+					ExtractAggregateSpec<TInclude[K]>
+				>;
+			};
+
+type WithAggregatesForInclude<
+	TDoc,
+	TTableDocMap extends Record<string, TableDocBase>,
+	TInclude,
+> = keyof AggregateMapForInclude<TDoc, TTableDocMap, TInclude> extends never
+	? {}
+	: { _aggregates: AggregateMapForInclude<TDoc, TTableDocMap, TInclude> };
 
 export type AppflareResultDoc<
 	TDoc,
@@ -54,7 +129,8 @@ export type AppflareResultDoc<
 		TTableDocMap
 	>,
 	SelectedKeys<TDoc, TSelect>
->;
+> &
+	WithAggregatesForInclude<TDoc, TTableDocMap, TInclude>;
 
 export type SortDirection = "asc" | "desc";
 
@@ -170,6 +246,18 @@ export type MongoDbQuery<
 		TableName,
 		TTableDocMap,
 		WithPopulatedMany<TResultDoc, TKeys[number], TTableDocMap>
+	>;
+	populate<TInclude extends AppflareInclude<TResultDoc, TTableDocMap>>(
+		include: TInclude
+	): MongoDbQuery<
+		TableName,
+		TTableDocMap,
+		WithPopulatedMany<
+			TResultDoc,
+			IncludedKeys<TResultDoc, TInclude, TTableDocMap>,
+			TTableDocMap
+		> &
+			WithAggregatesForInclude<TResultDoc, TTableDocMap, TInclude>
 	>;
 
 	find(): Promise<Array<TResultDoc>>;

@@ -28,7 +28,9 @@ import { z } from "zod";
 import {
 	internalMutation,
 	internalQuery,
+	type AppflareInclude,
 	type EditableDoc,
+	type Doc,
 	type Id,
 	type QuerySort,
 	type QueryWhere,
@@ -42,6 +44,8 @@ export const ${findFn} = internalQuery({
 			.optional(),
 		limit: z.number().int().nonnegative().optional(),
 		offset: z.number().int().nonnegative().optional(),
+		include: z.custom<AppflareInclude<Doc<${JSON.stringify(params.tableName)}>>>()
+			.optional(),
 	},
 	handler: async (ctx, args) => {
 		return ctx.db[${JSON.stringify(params.tableName)} as any].findMany({
@@ -49,6 +53,7 @@ export const ${findFn} = internalQuery({
 			orderBy: args.sort as any,
 			skip: args.offset,
 			take: args.limit,
+				include: args.include as any,
 		});
 	},
 });
@@ -60,6 +65,8 @@ export const ${findOneFn} = internalQuery({
 		sort: z.custom<QuerySort<${JSON.stringify(params.tableName)}>>()
 			.optional(),
 		offset: z.number().int().nonnegative().optional(),
+		include: z.custom<AppflareInclude<Doc<${JSON.stringify(params.tableName)}>>>()
+			.optional(),
 	},
 	handler: async (ctx, args) => {
 		return ctx.db[${JSON.stringify(params.tableName)} as any].findFirst({
@@ -67,6 +74,7 @@ export const ${findOneFn} = internalQuery({
 			orderBy: args.sort as any,
 			skip: args.offset,
 			take: 1,
+				include: args.include as any,
 		});
 	},
 });
@@ -77,7 +85,8 @@ export const ${sumFn} = internalQuery({
 		where: z.custom<QueryWhere<${JSON.stringify(params.tableName)}>>()
 			.optional(),
 		groupBy: z.union([z.string(), z.array(z.string())]).optional(),
-		populate: z.union([z.string(), z.array(z.string())]).optional(),
+		populate: z.custom<AppflareInclude<Doc<${JSON.stringify(params.tableName)}>>>()
+			.optional(),
 	},
 	handler: async (ctx, args) => {
 		return ctx.db[${JSON.stringify(params.tableName)} as any].aggregate({
@@ -95,7 +104,8 @@ export const ${avgFn} = internalQuery({
 		where: z.custom<QueryWhere<${JSON.stringify(params.tableName)}>>()
 			.optional(),
 		groupBy: z.union([z.string(), z.array(z.string())]).optional(),
-		populate: z.union([z.string(), z.array(z.string())]).optional(),
+		populate: z.custom<AppflareInclude<Doc<${JSON.stringify(params.tableName)}>>>()
+			.optional(),
 	},
 	handler: async (ctx, args) => {
 		return ctx.db[${JSON.stringify(params.tableName)} as any].aggregate({

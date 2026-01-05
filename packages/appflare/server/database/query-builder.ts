@@ -19,6 +19,41 @@ export function createQueryBuilder<
 	let offset: number | undefined;
 	let selectedKeys: string[] | undefined;
 	let populateKeys: string[] = [];
+	let populateAggregates: Record<
+		string,
+		{
+			count?: boolean;
+			sum?: string[];
+			avg?: string[];
+		}
+	> = {};
+	let populateIncludeDocs: Record<string, boolean> = {};
+
+	const normalizeAggregate = (
+		value: unknown
+	): { count?: boolean; sum?: string[]; avg?: string[] } | undefined => {
+		if (!value || typeof value !== "object") return undefined;
+		const spec = value as Record<string, unknown>;
+		const out: { count?: boolean; sum?: string[]; avg?: string[] } = {};
+		if (spec.count) out.count = true;
+		if (Array.isArray(spec.sum)) out.sum = spec.sum.map((k) => String(k));
+		if (Array.isArray(spec.avg)) out.avg = spec.avg.map((k) => String(k));
+		return Object.keys(out).length ? out : undefined;
+	};
+
+	const addPopulateKey = (
+		key: string,
+		opts?: {
+			aggregate?: { count?: boolean; sum?: string[]; avg?: string[] };
+			includeDocs?: boolean;
+		}
+	) => {
+		const ks = String(key);
+		if (!populateKeys.includes(ks)) populateKeys.push(ks);
+		if (opts?.aggregate) populateAggregates[ks] = opts.aggregate;
+		if (opts?.includeDocs !== undefined)
+			populateIncludeDocs[ks] = opts.includeDocs;
+	};
 
 	const api: MongoDbQuery<any, any, any> = {
 		where(next) {
@@ -50,11 +85,28 @@ export function createQueryBuilder<
 			return api;
 		},
 		populate(arg: any) {
-			const keys = Array.isArray(arg) ? arg : [arg];
-			for (const k of keys) {
-				const ks = String(k);
-				if (!populateKeys.includes(ks)) populateKeys.push(ks);
+			if (Array.isArray(arg)) {
+				for (const k of arg) addPopulateKey(k as any);
+				return api;
 			}
+
+			if (arg && typeof arg === "object") {
+				for (const [key, value] of Object.entries(
+					arg as Record<string, unknown>
+				)) {
+					if (!value) continue;
+					const includeObj =
+						typeof value === "object" && !Array.isArray(value)
+							? (value as Record<string, unknown>)
+							: undefined;
+					const aggregate = normalizeAggregate(includeObj?.aggregate);
+					const includeDocs = includeObj?.includeDocs;
+					addPopulateKey(key, { aggregate, includeDocs });
+				}
+				return api;
+			}
+
+			if (arg !== undefined) addPopulateKey(arg as any);
 			return api;
 		},
 		async find() {
@@ -80,6 +132,8 @@ export function createQueryBuilder<
 					docs,
 					currentTable: params.table as string,
 					populateKeys,
+					aggregate: populateAggregates,
+					includeDocs: populateIncludeDocs,
 					selectedKeys,
 					refs: params.refs,
 					getCollection: params.getCollection,

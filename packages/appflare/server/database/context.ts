@@ -110,6 +110,7 @@ export function createMongoDbContext<
 
 function toKeyList(arg: unknown): string[] | undefined {
 	if (!arg) return undefined;
+	if (typeof arg === "string" || typeof arg === "number") return [String(arg)];
 	if (Array.isArray(arg)) return arg.map((k) => String(k));
 	if (typeof arg === "object") {
 		return Object.entries(arg as Record<string, unknown>)
@@ -130,7 +131,6 @@ function createAppflareTableClient<
 	getCollection: (table: string) => Collection<Document>;
 }): AppflareTableClient<TableName, TTableDocMap> {
 	const selectKeys = (select: unknown) => toKeyList(select);
-	const includeKeys = (include: unknown) => toKeyList(include);
 
 	const toArray = <T>(value: T | T[] | undefined): T[] => {
 		if (value === undefined) return [];
@@ -169,8 +169,7 @@ function createAppflareTableClient<
 		if (args?.take !== undefined) q = q.limit(args.take);
 		const s = selectKeys(args?.select);
 		if (s?.length) q = q.select(s as any);
-		const i = includeKeys(args?.include);
-		if (i?.length) q = q.populate(i as any);
+		if (args?.include) q = q.populate(args.include as any);
 		return q;
 	};
 
@@ -296,7 +295,7 @@ function createAppflareTableClient<
 			pipeline.push({ $group: groupStage });
 
 			const tableRefs = params.refs.get(params.table as string) ?? new Map();
-			const populateKeys = toArray(args.populate).filter(Boolean) as string[];
+			const populateKeys = toKeyList(args.populate) ?? [];
 			for (const key of populateKeys) {
 				if (!groupKeys.includes(key)) continue;
 				const target = tableRefs.get(key);
