@@ -78,6 +78,11 @@ export type ExtractIdTableName<T> =
 			? ExtractIdTableName<TItem>
 			: never;
 
+export type NumericKeys<T> = {
+	[K in keyof T]: NonNil<T[K]> extends number | bigint ? K : never;
+}[keyof T] &
+	string;
+
 export type PopulateValue<
 	T,
 	TTableDocMap extends Record<string, TableDocBase>,
@@ -310,6 +315,59 @@ export type AppflareCountArgs<
 	where?: QueryWhere<TTableDocMap[TableName]>;
 };
 
+type AggregateGroupInput<TDoc> =
+	| ReadonlyArray<keyof TDoc & string>
+	| (keyof TDoc & string);
+
+type NormalizeGroupInput<TDoc, TGroup> = TGroup extends readonly (infer K)[]
+	? ReadonlyArray<Extract<K, keyof TDoc & string>>
+	: TGroup extends string
+		? ReadonlyArray<Extract<TGroup, keyof TDoc & string>>
+		: ReadonlyArray<never>;
+
+type AggregateId<
+	TDoc,
+	TGroup extends ReadonlyArray<keyof TDoc & string>,
+> = TGroup extends readonly []
+	? null
+	: TGroup extends readonly [infer K]
+		? TDoc[Extract<K, keyof TDoc>]
+		: { [K in TGroup[number]]: TDoc[K] };
+
+type AggregateResult<
+	TDoc,
+	TGroup extends ReadonlyArray<keyof TDoc & string>,
+	TSum extends ReadonlyArray<NumericKeys<TDoc>>,
+	TAvg extends ReadonlyArray<NumericKeys<TDoc>>,
+> = {
+	_id: AggregateId<TDoc, TGroup>;
+} & (TSum[number] extends never
+	? {}
+	: { [K in TSum[number] as `sum_${K}`]: number }) &
+	(TAvg[number] extends never
+		? {}
+		: { [K in TAvg[number] as `avg_${K}`]: number });
+
+export type AppflareAggregateArgs<
+	TableName extends string,
+	TTableDocMap extends Record<TableName, TableDocBase>,
+	TGroup = AggregateGroupInput<TTableDocMap[TableName]>,
+	TSum extends ReadonlyArray<NumericKeys<TTableDocMap[TableName]>> =
+		ReadonlyArray<NumericKeys<TTableDocMap[TableName]>>,
+	TAvg extends ReadonlyArray<NumericKeys<TTableDocMap[TableName]>> =
+		ReadonlyArray<NumericKeys<TTableDocMap[TableName]>>,
+> = {
+	where?: QueryWhere<TTableDocMap[TableName]>;
+	groupBy?: TGroup;
+	sum?: TSum;
+	avg?: TAvg;
+	/**
+	 * Populate aggregated group keys that are references to other tables.
+	 * Only keys present in groupBy are eligible for populate.
+	 */
+	populate?: AppflareInclude<TTableDocMap[TableName], TTableDocMap>;
+};
+
 export type AppflareTableClient<
 	TableName extends string,
 	TTableDocMap extends Record<TableName, TableDocBase>,
@@ -394,6 +452,24 @@ export type AppflareTableClient<
 		args?: AppflareDeleteManyArgs<TableName, TTableDocMap>
 	): Promise<{ count: number }>;
 	count(args?: AppflareCountArgs<TableName, TTableDocMap>): Promise<number>;
+	aggregate<
+		TGroup = AggregateGroupInput<TTableDocMap[TableName]>,
+		TSum extends ReadonlyArray<NumericKeys<TTableDocMap[TableName]>> =
+			ReadonlyArray<NumericKeys<TTableDocMap[TableName]>>,
+		TAvg extends ReadonlyArray<NumericKeys<TTableDocMap[TableName]>> =
+			ReadonlyArray<NumericKeys<TTableDocMap[TableName]>>,
+	>(
+		args: AppflareAggregateArgs<TableName, TTableDocMap, TGroup, TSum, TAvg>
+	): Promise<
+		Array<
+			AggregateResult<
+				TTableDocMap[TableName],
+				NormalizeGroupInput<TTableDocMap[TableName], TGroup>,
+				TSum,
+				TAvg
+			>
+		>
+	>;
 };
 
 export type AppflareModelMap<

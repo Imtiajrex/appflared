@@ -6,10 +6,16 @@ export const getTickets = query({
 		id: z.string().optional(),
 	},
 	handler: async (ctx, args) => {
-		return ctx.db.tickets.findMany({
+		const result = await ctx.db.tickets.findMany({
 			where: args.id ? { _id: args.id } : undefined,
 			include: { roombas: true, user: true },
 		});
+		const res = await ctx.db.tickets.aggregate({
+			avg: ["stock"],
+			sum: ["stock"],
+		});
+		console.log("Aggregate Result:", res);
+		return result;
 	},
 });
 
@@ -36,6 +42,7 @@ export const createTicket = mutation({
 				body: args.body,
 				roombas,
 				user: args.user || null,
+				stock: 10,
 			},
 		});
 

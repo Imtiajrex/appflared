@@ -13,6 +13,8 @@ export const buildHandlerFileContent = (
 ): string => {
 	const findFn = `find${params.pascalName}`;
 	const findOneFn = `findOne${params.pascalName}`;
+	const sumFn = `sum${params.pascalName}`;
+	const avgFn = `avg${params.pascalName}`;
 	const insertFn = `insert${params.pascalName}`;
 	const updateFn = `update${params.pascalName}`;
 	const deleteFn = `delete${params.pascalName}`;
@@ -69,6 +71,42 @@ export const ${findOneFn} = internalQuery({
 	},
 });
 
+export const ${sumFn} = internalQuery({
+	args: {
+		fields: z.array(z.string()).min(1),
+		where: z.custom<QueryWhere<${JSON.stringify(params.tableName)}>>()
+			.optional(),
+		groupBy: z.union([z.string(), z.array(z.string())]).optional(),
+		populate: z.union([z.string(), z.array(z.string())]).optional(),
+	},
+	handler: async (ctx, args) => {
+		return ctx.db[${JSON.stringify(params.tableName)} as any].aggregate({
+			where: args.where as any,
+			groupBy: args.groupBy as any,
+			sum: args.fields as any,
+			populate: args.populate as any,
+		});
+	},
+});
+
+export const ${avgFn} = internalQuery({
+	args: {
+		fields: z.array(z.string()).min(1),
+		where: z.custom<QueryWhere<${JSON.stringify(params.tableName)}>>()
+			.optional(),
+		groupBy: z.union([z.string(), z.array(z.string())]).optional(),
+		populate: z.union([z.string(), z.array(z.string())]).optional(),
+	},
+	handler: async (ctx, args) => {
+		return ctx.db[${JSON.stringify(params.tableName)} as any].aggregate({
+			where: args.where as any,
+			groupBy: args.groupBy as any,
+			avg: args.fields as any,
+			populate: args.populate as any,
+		});
+	},
+});
+
 export const ${insertFn} = internalMutation({
 	args: {
 		value: z.custom<EditableDoc<${JSON.stringify(params.tableName)}>>(),
@@ -121,11 +159,13 @@ export const ${deleteFn} = internalMutation({
 export const buildExportLine = (params: ExportLineParams): string => {
 	const findFn = `find${params.pascalName}`;
 	const findOneFn = `findOne${params.pascalName}`;
+	const sumFn = `sum${params.pascalName}`;
+	const avgFn = `avg${params.pascalName}`;
 	const insertFn = `insert${params.pascalName}`;
 	const updateFn = `update${params.pascalName}`;
 	const deleteFn = `delete${params.pascalName}`;
 
-	return `export { ${findFn}, ${findOneFn}, ${insertFn}, ${updateFn}, ${deleteFn} } from "./${params.tableName}";`;
+	return `export { ${findFn}, ${findOneFn}, ${sumFn}, ${avgFn}, ${insertFn}, ${updateFn}, ${deleteFn} } from "./${params.tableName}";`;
 };
 
 export const buildIndexFileContent = (

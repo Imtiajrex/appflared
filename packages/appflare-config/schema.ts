@@ -6,6 +6,7 @@ export default defineSchema({
 		body: v.string(),
 		user: v.id("users"),
 		roombas: v.array(v.id("roombas")),
+		stock: v.number().default(0),
 	}),
 	users: defineTable({
 		name: v.string(),
