@@ -7,6 +7,7 @@ export default defineSchema({
 		user: v.id("users"),
 		roombas: v.array(v.id("roombas")),
 		stock: v.number().default(0),
+		location: v.point(),
 	}),
 	users: defineTable({
 		name: v.string(),

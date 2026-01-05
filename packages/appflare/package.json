@@ -8,6 +8,7 @@
 		".": "./index.ts",
 		"./db": "./lib/db.ts",
 		"./values": "./lib/values.ts",
+		"./location": "./lib/location.ts",
 		"./*": "./*.ts",
 		"./react/*": "./react/*.ts",
 		"./react": "./react/index.ts",

@@ -19,9 +19,15 @@ Docs for the shared library helpers in `lib/`
 
 - Primitives: `v.string()`, `v.number()`, `v.boolean()`, `v.date()`.
 - Relations/ids: `v.id(table)` creates a string with an ObjectId regex and a `ref:<table>` description for downstream typing.
+- Location: `v.point()`/`v.location()` yields a GeoJSON Point schema for geospatial queries.
 - Collections/objects: `v.array(item)`, `v.object(shape)`.
 - Modifiers: `v.optional(schema)`, `v.nullable(schema)`, `v.union(...schemas)`, `v.literal(value)`.
 - Misc: `v.buffer()` (string placeholder), `v.any()`, `v.unknown()`.
+
+**Location helpers** ([packages/appflare/lib/location.ts](packages/appflare/lib/location.ts))
+
+- Builders: `point(lng, lat)` returns a GeoJSON Point; `geo.point` is the same alias.
+- Queries: `geo.near("location", pointLngLat, { maxDistanceMeters })`, `geo.withinRadius("location", center, radiusMeters)`, `geo.withinBox(...)`, `geo.withinPolygon(...)`, `geo.intersects(...)` produce Mongo-ready filters you can pass to `where`.
 
 **Example: define a schema**
 
@@ -35,6 +41,7 @@ export default defineSchema({
 		email: v.string(),
 		age: v.number().optional(),
 		orgId: v.id("orgs"),
+		location: v.point(),
 	}),
 	orgs: defineTable({
 		name: v.string(),

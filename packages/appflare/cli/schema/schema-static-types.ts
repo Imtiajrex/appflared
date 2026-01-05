@@ -57,6 +57,100 @@ export type QuerySort<TableName extends TableNames> =
 	| Record<string, SortDirection>
 	| Array<[string, SortDirection]>;
 
+type GeoCoordinates = readonly [number, number];
+
+export type GeoPoint = {
+	type: "Point";
+	coordinates: GeoCoordinates;
+};
+
+type GeoPointInput = GeoPoint | GeoCoordinates;
+
+const GEO_EARTH_RADIUS_METERS = 6_378_100;
+
+const __geoNormalizePoint = (point: GeoPointInput): GeoPoint =>
+	Array.isArray(point)
+		? { type: "Point", coordinates: [point[0], point[1]] }
+		: point;
+
+export const geo = {
+	point(lng: number, lat: number): GeoPoint {
+		return { type: "Point", coordinates: [lng, lat] };
+	},
+	near(
+		field: string,
+		point: GeoPointInput,
+		options: { maxDistanceMeters?: number; minDistanceMeters?: number } = {}
+	): Record<string, unknown> {
+		const $near: Record<string, unknown> = {
+			$geometry: __geoNormalizePoint(point),
+		};
+		if (options.maxDistanceMeters !== undefined)
+			$near.$maxDistance = options.maxDistanceMeters;
+		if (options.minDistanceMeters !== undefined)
+			$near.$minDistance = options.minDistanceMeters;
+		return { [field]: { $near } };
+	},
+	withinRadius(
+		field: string,
+		center: GeoPointInput,
+		radiusMeters: number
+	): Record<string, unknown> {
+		return {
+			[field]: {
+				$geoWithin: {
+					$centerSphere: [
+						__geoNormalizePoint(center).coordinates,
+						radiusMeters / GEO_EARTH_RADIUS_METERS,
+					],
+				},
+			},
+		};
+	},
+	withinBox(
+		field: string,
+		southwest: GeoPointInput,
+		northeast: GeoPointInput
+	): Record<string, unknown> {
+		return {
+			[field]: {
+				$geoWithin: {
+					$box: [
+						__geoNormalizePoint(southwest).coordinates,
+						__geoNormalizePoint(northeast).coordinates,
+					],
+				},
+			},
+		};
+	},
+	withinPolygon(
+		field: string,
+		polygon: ReadonlyArray<GeoPointInput>
+	): Record<string, unknown> {
+		return {
+			[field]: {
+				$geoWithin: {
+					$polygon: polygon.map((p) =>
+						__geoNormalizePoint(p).coordinates
+					),
+				},
+			},
+		};
+	},
+	intersects(
+		field: string,
+		geometry: { type: string; coordinates: unknown }
+	): Record<string, unknown> {
+		return {
+			[field]: {
+				$geoIntersects: {
+					$geometry: geometry,
+				},
+			},
+		};
+	},
+};
+
 type SelectedKeys<TDoc, TSelect> =
 	TSelect extends readonly (infer TKey)[]
 		? Extract<TKey, Keys<TDoc>>

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { mutation, query } from "./_generated/src/schema-types";
+import { geo } from "appflare/location";
 
 export const getTickets = query({
 	args: {
@@ -13,6 +14,11 @@ export const getTickets = query({
 		const res = await ctx.db.tickets.aggregate({
 			avg: ["stock"],
 			sum: ["stock"],
+			where: {
+				...geo.near("location", geo.point(-73.97, 40.77), {
+					maxDistanceMeters: 5000,
+				}),
+			},
 		});
 		console.log("Aggregate Result:", res);
 		return result;
@@ -43,6 +49,7 @@ export const createTicket = mutation({
 				roombas,
 				user: args.user || null,
 				stock: 10,
+				location: geo.point(-73.97, 40.77),
 			},
 		});
 

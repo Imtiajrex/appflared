@@ -1,10 +1,13 @@
 import { z } from "zod";
+import { geoPointSchema } from "./location";
 
 export const v = {
 	string: () => z.string(),
 	number: () => z.number(),
 	boolean: () => z.boolean(),
 	date: () => z.date(),
+	point: () => geoPointSchema,
+	location: () => geoPointSchema,
 	id: (table: string) =>
 		z
 			.string()

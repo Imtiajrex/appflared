@@ -37,6 +37,12 @@ function renderField(fieldName: string, schema: any): string {
 function renderType(schema: any): { tsType: string; optional: boolean } {
 	const def = schema?._def;
 	const typeName: string | undefined = def?.typeName ?? def?.type;
+	const description: string | undefined =
+		schema?.description ?? def?.description;
+
+	if (description === "geo:point") {
+		return { tsType: "GeoPoint", optional: false };
+	}
 
 	if (typeName === "ZodOptional" || typeName === "optional") {
 		const inner = def?.innerType ?? def?.schema ?? schema?._def?.innerType;
