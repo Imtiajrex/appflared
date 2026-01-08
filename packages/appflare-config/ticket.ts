@@ -15,9 +15,7 @@ export const getTickets = query({
 			avg: ["stock"],
 			sum: ["stock"],
 			where: {
-				...geo.near("location", geo.point(-73.97, 40.77), {
-					maxDistanceMeters: 5000,
-				}),
+				stock: { gt: 0 },
 			},
 		});
 		console.log("Aggregate Result:", res);

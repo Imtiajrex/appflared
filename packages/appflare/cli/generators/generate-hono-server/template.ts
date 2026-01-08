@@ -50,6 +50,52 @@ export type AppflareDbContext = MongoDbContext<TableNames, TableDocMap>;
 export type AppflareServerContext = AppflareAuthContext & {
 	db: AppflareDbContext;
 	scheduler?: Scheduler;
+	error: AppflareErrorFactory;
+};
+
+export type AppflareHandlerError = Error & {
+	status: number;
+	details?: unknown;
+	__appflareHandlerError: true;
+};
+
+export type AppflareErrorFactory = (
+	status: number,
+	message?: string,
+	details?: unknown
+) => AppflareHandlerError;
+
+const createHandlerError: AppflareErrorFactory = (
+	status,
+	message,
+	details
+) => {
+	const err = new Error(message ?? \`HTTP \${status}\`);
+	err.name = "AppflareHandlerError";
+	const typed = err as AppflareHandlerError;
+	typed.status = status;
+	typed.details = details;
+	typed.__appflareHandlerError = true;
+	return typed;
+};
+
+const isHandlerError = (value: unknown): value is AppflareHandlerError =>
+	!!value &&
+	typeof value === "object" &&
+	(value as any).__appflareHandlerError === true &&
+	Number.isFinite((value as any).status);
+
+const handlerErrorBody = (
+	err: AppflareHandlerError
+): { error: string; details?: unknown } => {
+	const includeDetails =
+		err.details !== undefined &&
+		(err.details && typeof err.details === "object"
+			? !(err.details instanceof Error) && !Array.isArray(err.details)
+			: true);
+	return includeDetails
+		? { error: err.message, details: err.details }
+		: { error: err.message };
 };
 
 export function createAppflareDbContext(params: {
@@ -105,7 +151,8 @@ export type AppflareHonoServerOptions = {
 		c: HonoContext,
 		db: AppflareDbContext,
 		auth: AppflareAuthContext,
-		scheduler?: Scheduler
+		scheduler?: Scheduler,
+		error?: AppflareErrorFactory
 	) => AppflareServerContext | Promise<AppflareServerContext>;
 \tcollectionName?: (table: TableNames) => string;
 \tcorsOrigin?: string | string[];
@@ -135,6 +182,9 @@ function formatHandlerError(err: unknown): {
 \tstatus: number;
 \tbody: { error: string; details?: unknown };
 } {
+	if (isHandlerError(err)) {
+		return { status: err.status, body: handlerErrorBody(err) };
+	}
 \tconst statusCandidate =
 \t\ttypeof err === "object" && err !== null
 \t\t\t? Number((err as any).status ?? (err as any).statusCode)
@@ -192,8 +242,13 @@ export function createAppflareHonoServer(options: AppflareHonoServerOptions): Ho
 
 	const createContext =
 		options.createContext ??
-		((_c, db, auth, scheduler) =>
-			({ db, scheduler, ...auth } as AppflareServerContext));
+		((_c, db, auth, scheduler, error) =>
+			({
+				db,
+				scheduler,
+				error: error ?? createHandlerError,
+				...auth,
+			} as AppflareServerContext));
 \tconst notifyMutation = createMutationNotifier(options.realtime);
 \tconst app = new Hono();
 \tapp.use(
@@ -250,8 +305,17 @@ ${params.authSetupBlock}${params.authMountBlock}${params.authResolverBlock}\tcon
 		const db = await resolveDb(c);
 		const auth = await resolveAuthContext(c);
 		const scheduler = await resolveScheduler(c);
-		const ctx = await createContext(c, db, auth, scheduler);
-		return ctx ?? ({ db, scheduler, ...auth } as AppflareServerContext);
+		const error = createHandlerError;
+		const ctx = await createContext(c, db, auth, scheduler, error);
+		const merged = {
+			db,
+			scheduler,
+			error,
+			...auth,
+			...(ctx ?? {}),
+			error: (ctx as any)?.error ?? error,
+		};
+		return merged as AppflareServerContext;
 	};
 
 \t${params.routeLines.join("\n\n\t")}

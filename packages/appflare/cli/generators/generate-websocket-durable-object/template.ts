@@ -147,9 +147,57 @@ const resolveDatabase = (env: any) => {
 \treturn db;
 };
 
+type AppflareHandlerError = Error & {
+	status: number;
+	details?: unknown;
+	__appflareHandlerError: true;
+};
+
+type AppflareErrorFactory = (
+	status: number,
+	message?: string,
+	details?: unknown
+) => AppflareHandlerError;
+
+const createHandlerError: AppflareErrorFactory = (
+	status,
+	message,
+	details
+) => {
+	const err = new Error(message ?? \`HTTP \${status}\`);
+	err.name = "AppflareHandlerError";
+	const typed = err as AppflareHandlerError;
+	typed.status = status;
+	typed.details = details;
+	typed.__appflareHandlerError = true;
+	return typed;
+};
+
+const isHandlerError = (value: unknown): value is AppflareHandlerError =>
+	!!value &&
+	typeof value === "object" &&
+	(value as any).__appflareHandlerError === true &&
+	Number.isFinite((value as any).status);
+
+const handlerErrorBody = (
+	err: AppflareHandlerError
+): { error: string; details?: unknown } => {
+	const includeDetails =
+		err.details !== undefined &&
+		(err.details && typeof err.details === "object"
+			? !(err.details instanceof Error) && !Array.isArray(err.details)
+			: true);
+	return includeDetails
+		? { error: err.message, details: err.details }
+		: { error: err.message };
+};
+
 const formatHandlerError = (
 \terr: unknown
 ): { error: string; details?: unknown } => {
+	if (isHandlerError(err)) {
+		return handlerErrorBody(err);
+	}
 \tconst message =
 \t\terr instanceof Error
 \t\t\t? err.message
@@ -540,30 +588,34 @@ export class WebSocketHibernationServer extends DurableObject {
 \t\treturn true;
 \t}
 
-\tprivate async fetchData(sub: Subscription): Promise<unknown> {
-\t\tconst subWithAuth = await this.withAuth(sub);
-\t\tconst query = resolveQueryHandler(subWithAuth.handler);
-\t\tif (query) {
-\t\t\tconst ctx = this.createHandlerContext(subWithAuth.auth);
-\t\t\tconst parsedArgs = this.parseHandlerArgs(query, subWithAuth.where);
-\t\t\treturn await query.handler(ctx, parsedArgs);
-\t\t}
+	private async fetchData(sub: Subscription): Promise<unknown> {
+		const subWithAuth = await this.withAuth(sub);
+		const query = resolveQueryHandler(subWithAuth.handler);
+		if (query) {
+			const ctx = this.createHandlerContext(subWithAuth.auth);
+			const parsedArgs = this.parseHandlerArgs(query, subWithAuth.where);
+			const result = await query.handler(ctx, parsedArgs);
+			if (isHandlerError(result)) {
+				throw result;
+			}
+			return result;
+		}
 
-\t\tconst db = this.getDb();
-\t\tconst table = db[subWithAuth.table] as any;
-\t\tif (!table || typeof table.findMany !== "function") {
-\t\t\tthrow new Error("Unknown table: " + subWithAuth.table);
-\t\t}
-\t\tconst data = await table.findMany({
-\t\t\twhere: subWithAuth.where as any,
-\t\t\torderBy: subWithAuth.orderBy as any,
-\t\t\tskip: subWithAuth.skip,
-\t\t\ttake: subWithAuth.take,
-\t\t\tselect: subWithAuth.select as any,
-\t\t\tinclude: subWithAuth.include as any,
-\t\t});
-\t\treturn data ?? [];
-\t}
+		const db = this.getDb();
+		const table = db[subWithAuth.table] as any;
+		if (!table || typeof table.findMany !== "function") {
+			throw new Error("Unknown table: " + subWithAuth.table);
+		}
+		const data = await table.findMany({
+			where: subWithAuth.where as any,
+			orderBy: subWithAuth.orderBy as any,
+			skip: subWithAuth.skip,
+			take: subWithAuth.take,
+			select: subWithAuth.select as any,
+			include: subWithAuth.include as any,
+		});
+		return data ?? [];
+	}
 
 \tprivate parseHandlerArgs(
 \t\tquery: QueryHandlerDefinition,
@@ -586,7 +638,8 @@ export class WebSocketHibernationServer extends DurableObject {
 \t\treturn {
 \t\t\tdb: this.getDb(),
 \t\t\tsession: auth?.session ?? null,
-\t\t\tuser: auth?.user ?? null,
+			user: auth?.user ?? null,
+			error: createHandlerError,
 \t\t} as AppflareServerContext;
 \t}
 

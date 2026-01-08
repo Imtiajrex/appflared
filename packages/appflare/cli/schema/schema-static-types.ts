@@ -509,9 +509,22 @@ export const cron = <Env = unknown>(
 	definition: CronDefinition<Env>
 ): CronDefinition<Env> => definition;
 
+export type AppflareHandlerError = Error & {
+	status: number;
+	details?: unknown;
+	__appflareHandlerError: true;
+};
+
+export type AppflareErrorFactory = (
+	status: number,
+	message?: string,
+	details?: unknown
+) => AppflareHandlerError;
+
 export interface QueryContext extends AppflareAuthContext {
 	db: DatabaseReader;
 	scheduler?: Scheduler;
+	error: AppflareErrorFactory;
 }
 
 export interface InternalQueryContext {
@@ -547,6 +560,7 @@ export interface DatabaseWriter extends DatabaseReader {}
 export interface MutationContext extends AppflareAuthContext {
 	db: DatabaseWriter;
 	scheduler?: Scheduler;
+	error: AppflareErrorFactory;
 }
 
 export interface MutationDefinition<TArgs extends QueryArgsShape, TResult> {

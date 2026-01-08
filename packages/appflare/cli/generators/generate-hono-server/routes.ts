@@ -17,6 +17,10 @@ export function buildRouteLines(params: {
 				`\t\t\tconst query = c.req.valid("query");\n` +
 				`\t\t\tconst ctx = await resolveContext(c);\n` +
 				`\t\t\tconst result = await ${local}.handler(ctx as any, query as any);\n` +
+				`\t\t\tif (isHandlerError(result)) {\n` +
+				`\t\t\t\tconst { status, body } = formatHandlerError(result);\n` +
+				`\t\t\t\treturn c.json(body as any, status);\n` +
+				`\t\t\t}\n` +
 				`\t\t\treturn c.json(result, 200);\n` +
 				`\t\t} catch (err) {\n` +
 				`\t\t\tconst { status, body } = formatHandlerError(err);\n` +
@@ -38,6 +42,10 @@ export function buildRouteLines(params: {
 				`\t\t\tconst body = c.req.valid("json");\n` +
 				`\t\t\tconst ctx = await resolveContext(c);\n` +
 				`\t\t\tconst result = await ${local}.handler(ctx as any, body as any);\n` +
+				`\t\t\tif (isHandlerError(result)) {\n` +
+				`\t\t\t\tconst { status, body } = formatHandlerError(result);\n` +
+				`\t\t\t\treturn c.json(body as any, status);\n` +
+				`\t\t\t}\n` +
 				`\t\t\tif (notifyMutation) {\n` +
 				`\t\t\t\ttry {\n` +
 				`\t\t\t\t\tawait notifyMutation({\n` +

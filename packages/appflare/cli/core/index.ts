@@ -24,6 +24,10 @@ type AppflareConfig = {
 	dir: string;
 	schema: string;
 	outDir: string;
+	auth?: {
+		enabled?: boolean;
+		basePath?: string;
+	};
 };
 
 const program = new Command();
@@ -110,7 +114,6 @@ async function buildFromConfig(params: {
 	await fs.mkdir(path.join(outDirAbs, "src"), { recursive: true });
 	await fs.mkdir(path.join(outDirAbs, "server"), { recursive: true });
 
-			rootDir: `.`,
 	const schemaImportPathForGeneratedSrc = toImportPathFromGeneratedSrc(
 		outDirAbs,
 		schemaPathAbs
