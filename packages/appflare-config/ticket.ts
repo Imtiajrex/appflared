@@ -14,9 +14,7 @@ export const getTickets = query({
 		const res = await ctx.db.tickets.aggregate({
 			avg: ["stock"],
 			sum: ["stock"],
-			where: {
-				stock: { gt: 0 },
-			},
+			where: {},
 		});
 		console.log("Aggregate Result:", res);
 		return result;

@@ -1,6 +1,10 @@
 import type { Collection, Document, Filter, FindOptions, Sort } from "mongodb";
 import { applyPopulate } from "./populate";
-import { normalizeIdFilter, stringifyIdField } from "../utils/id-utils";
+import {
+	normalizeIdFilter,
+	stringifyIdField,
+	toMongoFilter,
+} from "../utils/id-utils";
 import type { MongoDbQuery, SchemaRefMap } from "../types/types";
 import { buildProjection, normalizeSort } from "./query-utils";
 
@@ -57,7 +61,9 @@ export function createQueryBuilder<
 
 	const api: MongoDbQuery<any, any, any> = {
 		where(next) {
-			const nextFilter = next as unknown as Filter<Document>;
+			const nextFilter = normalizeIdFilter(
+				toMongoFilter(next as unknown as Filter<Document>)
+			);
 			if (!filter) {
 				filter = nextFilter;
 			} else {

@@ -44,9 +44,60 @@ type WithSelected<TDoc, TKeys extends Keys<TDoc>> = Pick<TDoc, TKeys>;
 
 export type SortDirection = "asc" | "desc";
 
+type Comparable<T> = NonNil<T> extends number | bigint | Date ? NonNil<T> : never;
+
+type RegexOperand<T> = NonNil<T> extends string
+	? string | RegExp | { pattern: string; options?: string }
+	: never;
+
+type ArrayOperand<T> = ReadonlyArray<NonNil<T>>;
+
+type QueryWhereField<T> =
+	| NonNil<T>
+	| {
+			eq?: NonNil<T>;
+			$eq?: NonNil<T>;
+			ne?: NonNil<T>;
+			$ne?: NonNil<T>;
+			in?: ArrayOperand<T>;
+			$in?: ArrayOperand<T>;
+			nin?: ArrayOperand<T>;
+			$nin?: ArrayOperand<T>;
+			gt?: Comparable<T>;
+			$gt?: Comparable<T>;
+			gte?: Comparable<T>;
+			$gte?: Comparable<T>;
+			lt?: Comparable<T>;
+			$lt?: Comparable<T>;
+			lte?: Comparable<T>;
+			$lte?: Comparable<T>;
+			exists?: boolean;
+			$exists?: boolean;
+			regex?: RegexOperand<T>;
+			$regex?: RegexOperand<T>;
+			$options?: string;
+	  };
+
+type LogicalWhere<TableName extends TableNames> = {
+	$and?: ReadonlyArray<QueryWhere<TableName>>;
+	and?: ReadonlyArray<QueryWhere<TableName>>;
+	$or?: ReadonlyArray<QueryWhere<TableName>>;
+	or?: ReadonlyArray<QueryWhere<TableName>>;
+	$nor?: ReadonlyArray<QueryWhere<TableName>>;
+	nor?: ReadonlyArray<QueryWhere<TableName>>;
+	$not?: QueryWhere<TableName>;
+	not?: QueryWhere<TableName>;
+};
+
 export type QueryWhere<TableName extends TableNames> = Partial<
-	TableDocMap[TableName]
-> & Record<string, unknown>;
+	{
+		[K in keyof TableDocMap[TableName]]?: QueryWhereField<
+			TableDocMap[TableName][K]
+		>;
+	}
+> &
+	LogicalWhere<TableName> &
+	Record<string, unknown>;
 
 export type QuerySortKey<TableName extends TableNames> = keyof TableDocMap[TableName] &
 	string;

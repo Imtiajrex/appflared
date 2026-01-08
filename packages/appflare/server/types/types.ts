@@ -140,7 +140,57 @@ export type QuerySort<TKey extends string> =
 	| Record<string, SortDirection>
 	| Array<[string, SortDirection]>;
 
-export type QueryWhere<TDoc extends Record<string, unknown>> = Partial<TDoc> &
+type Comparable<T> =
+	NonNil<T> extends number | bigint | Date ? NonNil<T> : never;
+
+type RegexOperand<T> =
+	NonNil<T> extends string
+		? string | RegExp | { pattern: string; options?: string }
+		: never;
+
+type ArrayOperand<T> = ReadonlyArray<NonNil<T>>;
+
+type QueryWhereField<T> =
+	| NonNil<T>
+	| {
+			eq?: NonNil<T>;
+			$eq?: NonNil<T>;
+			ne?: NonNil<T>;
+			$ne?: NonNil<T>;
+			in?: ArrayOperand<T>;
+			$in?: ArrayOperand<T>;
+			nin?: ArrayOperand<T>;
+			$nin?: ArrayOperand<T>;
+			gt?: Comparable<T>;
+			$gt?: Comparable<T>;
+			gte?: Comparable<T>;
+			$gte?: Comparable<T>;
+			lt?: Comparable<T>;
+			$lt?: Comparable<T>;
+			lte?: Comparable<T>;
+			$lte?: Comparable<T>;
+			exists?: boolean;
+			$exists?: boolean;
+			regex?: RegexOperand<T>;
+			$regex?: RegexOperand<T>;
+			$options?: string;
+	  };
+
+type LogicalWhere<TDoc extends Record<string, unknown>> = {
+	$and?: ReadonlyArray<QueryWhere<TDoc>>;
+	and?: ReadonlyArray<QueryWhere<TDoc>>;
+	$or?: ReadonlyArray<QueryWhere<TDoc>>;
+	or?: ReadonlyArray<QueryWhere<TDoc>>;
+	$nor?: ReadonlyArray<QueryWhere<TDoc>>;
+	nor?: ReadonlyArray<QueryWhere<TDoc>>;
+	$not?: QueryWhere<TDoc>;
+	not?: QueryWhere<TDoc>;
+};
+
+export type QueryWhere<TDoc extends Record<string, unknown>> = Partial<{
+	[K in keyof TDoc]?: QueryWhereField<TDoc[K]>;
+}> &
+	LogicalWhere<TDoc> &
 	Record<string, unknown>;
 
 export type Keys<T> = keyof T;

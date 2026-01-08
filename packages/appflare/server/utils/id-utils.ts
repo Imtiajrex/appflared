@@ -14,6 +14,104 @@ function ensureObjectId(value: string | ObjectId): ObjectId {
 	return new ObjectId(value);
 }
 
+const OPERATOR_ALIAS_MAP: Record<string, string> = {
+	eq: "$eq",
+	ne: "$ne",
+	gt: "$gt",
+	gte: "$gte",
+	lt: "$lt",
+	lte: "$lte",
+	in: "$in",
+	nin: "$nin",
+	regex: "$regex",
+	exists: "$exists",
+};
+
+const LOGICAL_ALIAS_MAP: Record<string, string> = {
+	and: "$and",
+	or: "$or",
+	nor: "$nor",
+	not: "$not",
+};
+
+type NormalizedRegex =
+	| { $regex: string | RegExp; $options?: string }
+	| RegExp
+	| string;
+
+function normalizeRegexOperand(value: unknown): NormalizedRegex | undefined {
+	if (value instanceof RegExp) return value;
+	if (typeof value === "string") return value;
+	if (value && typeof value === "object") {
+		const obj = value as Record<string, unknown>;
+		const pattern = obj.pattern ?? obj.regex ?? obj.$regex;
+		const options = obj.options ?? obj.$options;
+		if (pattern instanceof RegExp) return pattern;
+		if (typeof pattern === "string") {
+			const normalized: { $regex: string; $options?: string } = {
+				$regex: pattern,
+			};
+			if (typeof options === "string" && options.length > 0) {
+				normalized.$options = options;
+			}
+			return normalized;
+		}
+	}
+	return undefined;
+}
+
+function normalizeWhereOperators(value: unknown): unknown {
+	if (Array.isArray(value)) return value.map(normalizeWhereOperators);
+	if (value instanceof RegExp || value instanceof Date) return value;
+	if (value && typeof value === "object") {
+		const obj = value as Record<string, unknown>;
+		const out: Record<string, unknown> = {};
+		for (const [key, val] of Object.entries(obj)) {
+			const logicalKey = LOGICAL_ALIAS_MAP[key];
+			if (logicalKey) {
+				const normalizedLogical = Array.isArray(val)
+					? (val as unknown[]).map(normalizeWhereOperators)
+					: normalizeWhereOperators(val);
+				out[logicalKey] = normalizedLogical;
+				continue;
+			}
+
+			if (key.startsWith("$")) {
+				out[key] = normalizeWhereOperators(val);
+				continue;
+			}
+
+			const opKey = OPERATOR_ALIAS_MAP[key];
+			if (opKey) {
+				if (opKey === "$regex") {
+					const normalizedRegex = normalizeRegexOperand(val);
+					if (normalizedRegex === undefined) continue;
+					if (
+						normalizedRegex &&
+						typeof normalizedRegex === "object" &&
+						!Array.isArray(normalizedRegex) &&
+						!(normalizedRegex instanceof RegExp)
+					) {
+						out.$regex = normalizedRegex.$regex;
+						if (normalizedRegex.$options) {
+							out.$options = normalizedRegex.$options;
+						}
+					} else {
+						out[opKey] = normalizeWhereOperators(normalizedRegex);
+					}
+					continue;
+				}
+				out[opKey] = normalizeWhereOperators(val);
+				continue;
+			}
+
+			out[key] = normalizeWhereOperators(val);
+		}
+		return out;
+	}
+	return value;
+}
+
 export function toMongoFilter(
 	where: Id<any> | QueryWhere<any>
 ): Filter<Document> {
@@ -21,7 +119,8 @@ export function toMongoFilter(
 		return { _id: ensureObjectId(where) } satisfies Filter<Document> as any;
 	}
 	if (where && typeof where === "object") {
-		return where as Filter<Document>;
+		const normalized = normalizeWhereOperators(where);
+		return normalized as Filter<Document>;
 	}
 	throw new Error("update/delete requires an id or where filter object");
 }

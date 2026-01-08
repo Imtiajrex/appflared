@@ -260,11 +260,13 @@ function createAppflareTableClient<
 
 			const normalizedWhere = args.where
 				? normalizeIdFilter(
-						normalizeRefFields(
-							params.table as string,
-							args.where as Record<string, unknown>,
-							params.refs
-						) as any
+						toMongoFilter(
+							normalizeRefFields(
+								params.table as string,
+								args.where as Record<string, unknown>,
+								params.refs
+							) as any
+						)
 					)
 				: undefined;
 			if (normalizedWhere && Object.keys(normalizedWhere).length > 0) {
