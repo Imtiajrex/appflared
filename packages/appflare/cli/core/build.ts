@@ -5,6 +5,7 @@ import {
 	AppflareConfig,
 	assertDirExists,
 	assertFileExists,
+	toImportPathFromGeneratedSrc,
 } from "../utils/utils";
 import { getSchemaTableNames, generateSchemaTypes } from "../schema/schema";
 import {
@@ -37,6 +38,17 @@ export async function buildFromConfig(params: {
 
 	await fs.mkdir(path.join(outDirAbs, "src"), { recursive: true });
 	await fs.mkdir(path.join(outDirAbs, "server"), { recursive: true });
+
+	// Re-export the user schema inside the generated output so downstream code can import it from the build directory.
+	const schemaImportPathForGeneratedSrc = toImportPathFromGeneratedSrc(
+		outDirAbs,
+		schemaPathAbs
+	);
+	const schemaReexport = `import schema from ${JSON.stringify(schemaImportPathForGeneratedSrc)};
+export type AppflareGeneratedSchema = typeof schema;
+export default schema;
+`;
+	await fs.writeFile(path.join(outDirAbs, "src", "schema.ts"), schemaReexport);
 
 	const schemaTypesTs = await generateSchemaTypes({
 		schemaPathAbs,
@@ -140,17 +152,18 @@ async function writeEmitTsconfig(params: {
 			declaration: true,
 			emitDeclarationOnly: false,
 			outDir: `./${outDirRel}/dist`,
-			rootDir: `./${outDirRel}/src`,
+			rootDir: `.`,
 			sourceMap: false,
 			declarationMap: false,
 			skipLibCheck: true,
 			target: "ES2022",
 			module: "ES2022",
 			moduleResolution: "Bundler",
-			types: [],
+			types: ["node"],
 		},
 		include: [
 			`./${outDirRel}/src/schema-types.ts`,
+			`./${outDirRel}/src/schema.ts`,
 			`./${outDirRel}/src/handlers/**/*`,
 		],
 	};

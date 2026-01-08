@@ -24,6 +24,7 @@ import {
 	AppflareConfig,
 	assertDirExists,
 	assertFileExists,
+	toImportPathFromGeneratedSrc,
 } from "./utils/utils";
 
 type WatchConfig = {
@@ -138,6 +139,17 @@ async function buildFromConfig(params: {
 
 	await fs.mkdir(path.join(outDirAbs, "src"), { recursive: true });
 	await fs.mkdir(path.join(outDirAbs, "server"), { recursive: true });
+
+	// Re-export the user schema inside the generated output so downstream code can import it from the build directory.
+	const schemaImportPathForGeneratedSrc = toImportPathFromGeneratedSrc(
+		outDirAbs,
+		schemaPathAbs
+	);
+	const schemaReexport = `import schema from ${JSON.stringify(schemaImportPathForGeneratedSrc)};
+export type AppflareGeneratedSchema = typeof schema;
+export default schema;
+`;
+	await fs.writeFile(path.join(outDirAbs, "src", "schema.ts"), schemaReexport);
 
 	const schemaTypesTs = await generateSchemaTypes({
 		schemaPathAbs,

@@ -1,7 +1,7 @@
+import { geo } from "appflare/location";
 import { z } from "zod";
 import { mutation, query } from "./_generated/src/schema-types";
-import { geo } from "appflare/location";
-
+import schema from "./_generated/src/schema";
 export const getTickets = query({
 	args: {
 		id: z.string().optional(),
@@ -26,13 +26,8 @@ export const getTickets = query({
 });
 
 export const createTicket = mutation({
-	args: {
-		body: z.string(),
-		user: z.string().optional(),
-		roombas: z.array(z.string()).optional(),
-	},
+	args: schema.tickets.shape,
 	handler: async (ctx, args) => {
-		const roombas = args.roombas ?? [];
 		const user = args.user
 			? await ctx.db.users.findUnique({
 					where: { _id: args.user },
@@ -46,7 +41,7 @@ export const createTicket = mutation({
 		const ticket = await ctx.db.tickets.create({
 			data: {
 				body: args.body,
-				roombas,
+				roombas: args.roombas ?? [],
 				user: args.user || null,
 				stock: 10,
 				location: geo.point(-73.97, 40.77),

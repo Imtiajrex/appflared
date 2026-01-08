@@ -71,7 +71,7 @@ const GEO_EARTH_RADIUS_METERS = 6_378_100;
 const __geoNormalizePoint = (point: GeoPointInput): GeoPoint =>
 	Array.isArray(point)
 		? { type: "Point", coordinates: [point[0], point[1]] }
-		: point;
+		: (point as GeoPoint);
 
 export const geo = {
 	point(lng: number, lat: number): GeoPoint {

@@ -1,6 +1,6 @@
 {
 	"name": "appflare",
-	"version": "0.0.10",
+	"version": "0.0.13",
 	"bin": {
 		"appflare": "./cli/index.ts"
 	},
@@ -25,12 +25,12 @@
 		"react": "^18.3.1"
 	},
 	"dependencies": {
-		"@hono/standard-validator": "^0.2.1",
 		"better-auth": "^1.4.9",
 		"better-fetch": "^1.1.2",
 		"chokidar": "^5.0.0",
-		"cloudflare-do-mongo": "^0.1.2",
 		"commander": "^14.0.1",
+		"@hono/standard-validator": "^0.2.1",
+		"cloudflare-do-mongo": "^0.1.2",
 		"hono": "^4.6.8",
 		"mongodb": "^7.0.0",
 		"zod": "^4.1.13"

@@ -82,7 +82,7 @@ export async function generateSchemaTypes(params: {
 
 	const authImports = configImportPath
 		? `import type appflareConfig from ${JSON.stringify(configImportPath)};
-import type { Auth, BetterAuthOptions } from "better-auth";
+import type { Auth, BetterAuthOptions,User,Session } from "better-auth";
 `
 		: "";
 
@@ -101,22 +101,15 @@ type __AppflareAuthSessionResult = __AppflareAuthOptions extends BetterAuthOptio
 		>
 	: null;
 
-export type AppflareAuthSession = __AppflareAuthSessionResult extends {
-	session: infer TSession;
-}
-	? TSession | null
-	: __AppflareAuthSessionResult;
 
-export type AppflareAuthUser = __AppflareAuthSessionResult extends {
-	user: infer TUser;
-}
-	? TUser | null
-	: null;
+export type AppflareAuthSession = Session | null
+export type AppflareAuthUser = User | null
 
 export type AppflareAuthContext = {
-	session: AppflareAuthSession;
-	user: AppflareAuthUser;
-};
+  session: AppflareAuthSession
+  user: AppflareAuthUser
+}
+
 `
 		: `export type AppflareAuthSession = null;
 export type AppflareAuthUser = null;

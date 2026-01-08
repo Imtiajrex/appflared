@@ -14,7 +14,11 @@ import {
 } from "./handlers";
 import { generateSchemaTypes, getSchemaTableNames } from "../schema/schema";
 import { runTscEmit, writeEmitTsconfig } from "../utils/tsc";
-import { assertDirExists, assertFileExists } from "../utils/utils";
+import {
+	assertDirExists,
+	assertFileExists,
+	toImportPathFromGeneratedSrc,
+} from "../utils/utils";
 
 type AppflareConfig = {
 	dir: string;
@@ -105,6 +109,17 @@ async function buildFromConfig(params: {
 
 	await fs.mkdir(path.join(outDirAbs, "src"), { recursive: true });
 	await fs.mkdir(path.join(outDirAbs, "server"), { recursive: true });
+
+			rootDir: `.`,
+	const schemaImportPathForGeneratedSrc = toImportPathFromGeneratedSrc(
+		outDirAbs,
+		schemaPathAbs
+	);
+	const schemaReexport = `import schema from ${JSON.stringify(schemaImportPathForGeneratedSrc)};
+export type AppflareGeneratedSchema = typeof schema;
+export default schema;
+`;
+	await fs.writeFile(path.join(outDirAbs, "src", "schema.ts"), schemaReexport);
 
 	const schemaTypesTs = await generateSchemaTypes({
 		schemaPathAbs,

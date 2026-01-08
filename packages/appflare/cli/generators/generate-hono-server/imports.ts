@@ -1,3 +1,4 @@
+import path from "node:path";
 import {
 	DiscoveredHandler,
 	groupBy,
@@ -18,9 +19,10 @@ export function buildImportSection(params: {
 	schemaPathAbs: string;
 	configPathAbs: string;
 }): ImportSection {
+	const generatedSchemaAbs = path.join(params.outDirAbs, "src", "schema.ts");
 	const schemaImportPath = toImportPathFromGeneratedServer(
 		params.outDirAbs,
-		params.schemaPathAbs
+		generatedSchemaAbs
 	);
 	const configImportPath = toImportPathFromGeneratedServer(
 		params.outDirAbs,

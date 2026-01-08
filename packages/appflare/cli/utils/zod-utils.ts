@@ -63,8 +63,8 @@ function renderType(schema: any): { tsType: string; optional: boolean } {
 		const description: string | undefined =
 			schema?.description ?? def?.description;
 		if (typeof description === "string" && description.startsWith("ref:")) {
-			const table = description.slice("ref:".length);
-			return { tsType: `Id<${JSON.stringify(table)}>`, optional: false };
+			// Treat reference fields as plain strings in generated types for friendlier typing/UX.
+			return { tsType: "string", optional: false };
 		}
 		return { tsType: "string", optional: false };
 	}
