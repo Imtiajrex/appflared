@@ -98,6 +98,26 @@ const handlerErrorBody = (
 		: { error: err.message };
 };
 
+async function runHandlerWithMiddleware<TArgs, TResult>(
+	handler: {
+		handler: (ctx: AppflareServerContext, args: TArgs) => Promise<TResult>;
+		middleware?: (
+			ctx: AppflareServerContext,
+			args: TArgs
+		) => Promise<TResult | void>;
+	},
+	ctx: AppflareServerContext,
+	args: TArgs
+): Promise<TResult> {
+	if (handler.middleware) {
+		const middlewareResult = await handler.middleware(ctx, args);
+		if (typeof middlewareResult !== "undefined") {
+			return middlewareResult as TResult;
+		}
+	}
+	return handler.handler(ctx, args);
+}
+
 export function createAppflareDbContext(params: {
 \tdb: import("mongodb").Db;
 \tcollectionName?: (table: TableNames) => string;

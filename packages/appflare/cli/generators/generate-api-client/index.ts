@@ -369,6 +369,15 @@ export async function runInternalQuery<
 	args: HandlerArgsFromShape<TArgs>
 ): Promise<TResult> {
 	const parsed = parseHandlerArgs(handler as any, args as any);
+	if (handler.middleware) {
+		const middlewareResult = await handler.middleware(
+			ctx as any,
+			parsed as any
+		);
+		if (typeof middlewareResult !== "undefined") {
+			return middlewareResult as TResult;
+		}
+	}
 	return handler.handler(ctx as any, parsed as any);
 }
 
@@ -381,6 +390,15 @@ export async function runInternalMutation<
 	args: HandlerArgsFromShape<TArgs>
 ): Promise<TResult> {
 	const parsed = parseHandlerArgs(handler as any, args as any);
+	if (handler.middleware) {
+		const middlewareResult = await handler.middleware(
+			ctx as any,
+			parsed as any
+		);
+		if (typeof middlewareResult !== "undefined") {
+			return middlewareResult as TResult;
+		}
+	}
 	return handler.handler(ctx as any, parsed as any);
 }
 

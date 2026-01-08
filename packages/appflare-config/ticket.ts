@@ -1,11 +1,18 @@
 import { geo } from "appflare/location";
 import { z } from "zod";
-import { mutation, query } from "./_generated/src/schema-types";
+import { mutation, query, QueryContext } from "./_generated/src/schema-types";
 import schema from "./_generated/src/schema";
+const middleware = async (ctx: QueryContext, args: any) => {
+	console.log("Context User:", ctx.user);
+	if (!ctx.user) {
+		throw ctx.error(401, "unauthorized");
+	}
+};
 export const getTickets = query({
 	args: {
 		id: z.string().optional(),
 	},
+	middleware,
 	handler: async (ctx, args) => {
 		const result = await ctx.db.tickets.findMany({
 			where: args.id ? { _id: args.id } : undefined,

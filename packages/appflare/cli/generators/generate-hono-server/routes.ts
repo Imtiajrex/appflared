@@ -16,7 +16,11 @@ export function buildRouteLines(params: {
 				`\t\ttry {\n` +
 				`\t\t\tconst query = c.req.valid("query");\n` +
 				`\t\t\tconst ctx = await resolveContext(c);\n` +
-				`\t\t\tconst result = await ${local}.handler(ctx as any, query as any);\n` +
+				`\t\t\tconst result = await runHandlerWithMiddleware(\n` +
+				`\t\t\t\t${local} as any,\n` +
+				`\t\t\t\tctx as any,\n` +
+				`\t\t\t\tquery as any\n` +
+				`\t\t\t);\n` +
 				`\t\t\tif (isHandlerError(result)) {\n` +
 				`\t\t\t\tconst { status, body } = formatHandlerError(result);\n` +
 				`\t\t\t\treturn c.json(body as any, status);\n` +
@@ -41,7 +45,11 @@ export function buildRouteLines(params: {
 				`\t\ttry {\n` +
 				`\t\t\tconst body = c.req.valid("json");\n` +
 				`\t\t\tconst ctx = await resolveContext(c);\n` +
-				`\t\t\tconst result = await ${local}.handler(ctx as any, body as any);\n` +
+				`\t\t\tconst result = await runHandlerWithMiddleware(\n` +
+				`\t\t\t\t${local} as any,\n` +
+				`\t\t\t\tctx as any,\n` +
+				`\t\t\t\tbody as any\n` +
+				`\t\t\t);\n` +
 				`\t\t\tif (isHandlerError(result)) {\n` +
 				`\t\t\t\tconst { status, body } = formatHandlerError(result);\n` +
 				`\t\t\t\treturn c.json(body as any, status);\n` +

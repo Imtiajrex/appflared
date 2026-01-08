@@ -594,6 +594,10 @@ export type InferQueryArgs<TArgs extends QueryArgsShape> = {
 
 export interface QueryDefinition<TArgs extends QueryArgsShape, TResult> {
 	args: TArgs;
+	middleware?: (
+		ctx: QueryContext,
+		args: InferQueryArgs<TArgs>
+	) => Promise<TResult | void>;
 	handler: (ctx: QueryContext, args: InferQueryArgs<TArgs>) => Promise<TResult>;
 }
 
@@ -616,6 +620,10 @@ export interface MutationContext extends AppflareAuthContext {
 
 export interface MutationDefinition<TArgs extends QueryArgsShape, TResult> {
 	args: TArgs;
+	middleware?: (
+		ctx: MutationContext,
+		args: InferQueryArgs<TArgs>
+	) => Promise<TResult | void>;
 	handler: (
 		ctx: MutationContext,
 		args: InferQueryArgs<TArgs>
@@ -636,6 +644,10 @@ export interface InternalQueryDefinition<
 	TResult,
 > {
 	args: TArgs;
+	middleware?: (
+		ctx: InternalQueryContext,
+		args: InferQueryArgs<TArgs>
+	) => Promise<TResult | void>;
 	handler: (
 		ctx: InternalQueryContext,
 		args: InferQueryArgs<TArgs>
@@ -651,6 +663,10 @@ export interface InternalMutationDefinition<
 	TResult,
 > {
 	args: TArgs;
+	middleware?: (
+		ctx: InternalMutationContext,
+		args: InferQueryArgs<TArgs>
+	) => Promise<TResult | void>;
 	handler: (
 		ctx: InternalMutationContext,
 		args: InferQueryArgs<TArgs>

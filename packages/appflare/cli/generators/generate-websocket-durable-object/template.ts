@@ -107,6 +107,10 @@ type QueryArgsParser = { parse?: (value: unknown) => unknown };
 
 type QueryHandlerDefinition = {
 \targs?: QueryArgsParser | unknown;
+	middleware?: (
+		ctx: import("./server").AppflareServerContext,
+		args: unknown
+	) => unknown | Promise<unknown>;
 \thandler: (
 \t\tctx: import("./server").AppflareServerContext,
 \t\targs: unknown
@@ -191,6 +195,26 @@ const handlerErrorBody = (
 		? { error: err.message, details: err.details }
 		: { error: err.message };
 };
+
+async function runHandlerWithMiddleware<TArgs, TResult>(
+	handler: {
+		handler: (ctx: AppflareServerContext, args: TArgs) => Promise<TResult> | TResult;
+		middleware?: (
+			ctx: AppflareServerContext,
+			args: TArgs
+		) => Promise<TResult | void> | TResult | void;
+	},
+	ctx: AppflareServerContext,
+	args: TArgs
+): Promise<TResult> {
+	if (handler.middleware) {
+		const middlewareResult = await handler.middleware(ctx, args);
+		if (typeof middlewareResult !== "undefined") {
+			return middlewareResult as TResult;
+		}
+	}
+	return handler.handler(ctx, args) as Promise<TResult>;
+}
 
 const formatHandlerError = (
 \terr: unknown
@@ -594,7 +618,11 @@ export class WebSocketHibernationServer extends DurableObject {
 		if (query) {
 			const ctx = this.createHandlerContext(subWithAuth.auth);
 			const parsedArgs = this.parseHandlerArgs(query, subWithAuth.where);
-			const result = await query.handler(ctx, parsedArgs);
+			const result = await runHandlerWithMiddleware(
+				query,
+				ctx,
+				parsedArgs as any
+			);
 			if (isHandlerError(result)) {
 				throw result;
 			}
