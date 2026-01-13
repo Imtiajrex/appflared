@@ -10,7 +10,7 @@ export function buildRouteLines(params: {
 		const local = params.localNameFor(query);
 		routeLines.push(
 			`app.get(\n` +
-				`\t${JSON.stringify(`/queries/${query.fileName}/${query.name}`)},\n` +
+				`	${JSON.stringify(`/queries/${query.routePath}/${query.name}`)},\n` +
 				`\tsValidator("query", z.object(${local}.args as any)),\n` +
 				`\tasync (c) => {\n` +
 				`\t\ttry {\n` +
@@ -39,7 +39,7 @@ export function buildRouteLines(params: {
 		const local = params.localNameFor(mutation);
 		routeLines.push(
 			`app.post(\n` +
-				`\t${JSON.stringify(`/mutations/${mutation.fileName}/${mutation.name}`)},\n` +
+				`\t${JSON.stringify(`/mutations/${mutation.routePath}/${mutation.name}`)},\n` +
 				`\tsValidator("json", z.object(${local}.args as any)),\n` +
 				`\tasync (c) => {\n` +
 				`\t\ttry {\n` +
@@ -58,7 +58,7 @@ export function buildRouteLines(params: {
 				`\t\t\t\ttry {\n` +
 				`\t\t\t\t\tawait notifyMutation({\n` +
 				`\t\t\t\t\t table: normalizeTableName(${JSON.stringify(mutation.fileName)}),\n` +
-				`\t\t\t\t\t handler: { file: ${JSON.stringify(mutation.fileName)}, name: ${JSON.stringify(mutation.name)} },\n` +
+				`\t\t\t\t\t handler: { file: ${JSON.stringify(mutation.routePath)}, name: ${JSON.stringify(mutation.name)} },\n` +
 				`\t\t\t\t\t args: body,\n` +
 				`\t\t\t\t\t result,\n` +
 				`\t\t\t\t});\n` +

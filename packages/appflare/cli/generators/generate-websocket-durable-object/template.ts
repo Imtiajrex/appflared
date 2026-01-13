@@ -137,10 +137,17 @@ const defaultHandlerForTable = (
 \t\tpossible.push(tableStr.slice(0, -1));
 \t}
 \tfor (const candidate of possible) {
-\t\tconst key = candidate + "/get" + pascalCase(candidate);
-\t\tif (key in queryHandlers) {
-\t\t\treturn { file: candidate, name: "get" + pascalCase(candidate) };
-\t\t}
+		const handlerName = "get" + pascalCase(candidate);
+		const suffix = "/" + handlerName;
+		const matchKey = Object.keys(queryHandlers).find((key) => {
+			if (!key.endsWith(suffix)) return false;
+			const segments = key.split("/");
+			return segments.length >= 2 && segments[segments.length - 2] === candidate;
+		});
+		if (matchKey) {
+			const file = matchKey.slice(0, matchKey.length - suffix.length);
+			return { file, name: handlerName };
+		}
 \t}
 \treturn null;
 };

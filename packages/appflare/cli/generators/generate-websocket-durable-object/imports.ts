@@ -28,7 +28,7 @@ export function buildImportSection(params: {
 	);
 
 	const localNameFor = (handler: DiscoveredHandler): string =>
-		`__appflare_${pascalCase(handler.fileName)}_${handler.name}`;
+		`__appflare_${pascalCase(handler.routePath)}_${handler.name}`;
 
 	const grouped = groupBy(params.queries, (handler) => handler.sourceFileAbs);
 	const handlerImports: string[] = [];

@@ -681,7 +681,7 @@ function generateImports(params: {
 	const importLines: string[] = [];
 	const importAliasBySource = new Map<string, string>();
 	for (const [fileAbs, list] of Array.from(handlerImportsGrouped.entries())) {
-		const alias = `__appflare_${pascalCase(list[0].fileName)}`;
+		const alias = `__appflare_${pascalCase(list[0].routePath)}`;
 		importAliasBySource.set(fileAbs, alias);
 		const importPath = toImportPathFromGeneratedSrc(params.outDirAbs, fileAbs);
 		importLines.push(
@@ -704,10 +704,13 @@ function generateGroupedHandlers(handlers: DiscoveredHandler[]): {
 		(h) => h.kind === "internalMutation"
 	);
 
-	const queriesByFile = groupBy(queries, (h) => h.fileName);
-	const mutationsByFile = groupBy(mutations, (h) => h.fileName);
-	const internalQueriesByFile = groupBy(internalQueries, (h) => h.fileName);
-	const internalMutationsByFile = groupBy(internalMutations, (h) => h.fileName);
+	const queriesByFile = groupBy(queries, (h) => h.routePath);
+	const mutationsByFile = groupBy(mutations, (h) => h.routePath);
+	const internalQueriesByFile = groupBy(internalQueries, (h) => h.routePath);
+	const internalMutationsByFile = groupBy(
+		internalMutations,
+		(h) => h.routePath
+	);
 
 	return {
 		queriesByFile,

@@ -52,6 +52,8 @@ export type HandlerKind =
 
 export type DiscoveredHandler = {
 	fileName: string;
+	/** Path relative to project root without .ts extension, using forward slashes. */
+	routePath: string;
 	name: string;
 	kind: HandlerKind;
 	sourceFileAbs: string;

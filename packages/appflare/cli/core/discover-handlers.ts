@@ -29,6 +29,13 @@ export async function discoverHandlers(params: {
 		if (path.resolve(fileAbs) === path.resolve(params.schemaPathAbs)) continue;
 		if (path.resolve(fileAbs) === path.resolve(params.configPathAbs)) continue;
 
+		const relPathRaw = path.relative(params.projectDirAbs, fileAbs);
+		const relPath = relPathRaw.replace(/\\/g, "/");
+		const rawRoutePath = relPath.replace(/\.ts$/, "");
+		const routePath = rawRoutePath.endsWith("/index")
+			? rawRoutePath.slice(0, -"/index".length) || "index"
+			: rawRoutePath;
+
 		const content = await fs.readFile(fileAbs, "utf8");
 		const cronTriggersByHandler = extractCronTriggers(content);
 		const regex =
@@ -38,6 +45,7 @@ export async function discoverHandlers(params: {
 			const kind = match[2] as HandlerKind;
 			handlers.push({
 				fileName: path.basename(fileAbs, ".ts"),
+				routePath,
 				name: match[1],
 				kind,
 				sourceFileAbs: fileAbs,
@@ -50,7 +58,7 @@ export async function discoverHandlers(params: {
 	// De-dupe: keep first occurrence
 	const seen = new Set<string>();
 	const unique = handlers.filter((h) => {
-		const key = `${h.kind}:${h.fileName}:${h.name}`;
+		const key = `${h.kind}:${h.routePath}:${h.name}`;
 		if (seen.has(key)) return false;
 		seen.add(key);
 		return true;
@@ -58,6 +66,8 @@ export async function discoverHandlers(params: {
 
 	unique.sort((a, b) => {
 		if (a.kind !== b.kind) return a.kind.localeCompare(b.kind);
+		if (a.routePath !== b.routePath)
+			return a.routePath.localeCompare(b.routePath);
 		if (a.fileName !== b.fileName) return a.fileName.localeCompare(b.fileName);
 		return a.name.localeCompare(b.name);
 	});

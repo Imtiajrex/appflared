@@ -14,11 +14,11 @@ export const buildCronHandlerEntries = (params: {
 	return params.handlers
 		.map((handler) => {
 			const local = params.localNameFor(handler);
-			const task = `${handler.fileName}/${handler.name}`;
+			const task = `${handler.routePath}/${handler.name}`;
 			const fallbackTriggers = stringifyTriggers(handler.cronTriggers);
 			return (
 				`\t${JSON.stringify(task)}: {\n` +
-				`\t\tfile: ${JSON.stringify(handler.fileName)},\n` +
+				`\t\tfile: ${JSON.stringify(handler.routePath)},\n` +
 				`\t\tname: ${JSON.stringify(handler.name)},\n` +
 				`\t\tcronTrigger: ${local}.cronTrigger ?? ${fallbackTriggers},\n` +
 				`\t\trun: ${local}.handler,\n` +

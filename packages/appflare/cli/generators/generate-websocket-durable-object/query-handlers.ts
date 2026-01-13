@@ -7,12 +7,12 @@ export function buildQueryHandlerEntries(params: {
 	return params.queries
 		.slice()
 		.sort((a, b) => {
-			if (a.fileName === b.fileName) return a.name.localeCompare(b.name);
-			return a.fileName.localeCompare(b.fileName);
+			if (a.routePath === b.routePath) return a.name.localeCompare(b.name);
+			return a.routePath.localeCompare(b.routePath);
 		})
 		.map(
 			(query) =>
-				`\t${JSON.stringify(`${query.fileName}/${query.name}`)}: { file: ${JSON.stringify(query.fileName)}, name: ${JSON.stringify(query.name)}, definition: ${params.localNameFor(query)} },`
+				`	${JSON.stringify(`${query.routePath}/${query.name}`)}: { file: ${JSON.stringify(query.routePath)}, name: ${JSON.stringify(query.name)}, definition: ${params.localNameFor(query)} },`
 		)
 		.join("\n");
 }

@@ -9,10 +9,10 @@ export const buildHandlerEntries = (params: {
 	return params.handlers
 		.map((handler) => {
 			const local = params.localNameFor(handler);
-			const task = `${handler.fileName}/${handler.name}`;
+			const task = `${handler.routePath}/${handler.name}`;
 			return (
 				`\t${JSON.stringify(task)}: {\n` +
-				`\t\tfile: ${JSON.stringify(handler.fileName)},\n` +
+				`	\tfile: ${JSON.stringify(handler.routePath)},\n` +
 				`\t\tname: ${JSON.stringify(handler.name)},\n` +
 				`\t\trun: ${local}.handler,\n` +
 				`\t},`
