@@ -43,7 +43,7 @@ const renderPathTreeLines = <T>(
 	for (const [segment, child] of children) {
 		lines.push(`${indent(depth + 1)}${renderObjectKey(segment)}: {`);
 		lines.push(...renderPathTreeLines(child, depth + 1, renderLeaf));
-		lines.push(`${indent(depth + 1)}}`);
+		lines.push(`${indent(depth + 1)}},`);
 	}
 	return lines;
 };
@@ -99,7 +99,7 @@ export function generateQueriesClientLines(
 	for (const [segment, child] of children) {
 		lines.push(`${indent(1)}${renderObjectKey(segment)}: {`);
 		lines.push(...renderPathTreeLines(child, 1, renderLeaf));
-		lines.push(`${indent(1)}}`);
+		lines.push(`${indent(1)}},`);
 	}
 	return lines.join("\n");
 }
@@ -157,7 +157,7 @@ export function generateMutationsClientLines(
 	for (const [segment, child] of children) {
 		lines.push(`${indent(1)}${renderObjectKey(segment)}: {`);
 		lines.push(...renderPathTreeLines(child, 1, renderLeaf));
-		lines.push(`${indent(1)}}`);
+		lines.push(`${indent(1)}},`);
 	}
 	return lines.join("\n");
 }
