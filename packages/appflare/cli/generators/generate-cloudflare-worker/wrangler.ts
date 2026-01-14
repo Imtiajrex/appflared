@@ -33,12 +33,15 @@ export function generateWranglerJson(params: {
 		: `${toQueueName(sanitizeWorkerName(params.configDirAbs))}-scheduler`;
 
 	const workerMain = params.config.wranglerMain ?? "./server/index.ts";
+	const compatibilityDate =
+		params.config.wranglerCompatibilityDate ??
+		new Date().toISOString().slice(0, 10);
 
 	const wrangler: Record<string, unknown> = {
 		$schema: "node_modules/wrangler/config-schema.json",
 		name: sanitizeWorkerName(params.configDirAbs),
 		main: workerMain,
-		compatibility_date: new Date().toISOString().slice(0, 10),
+		compatibility_date: compatibilityDate,
 		compatibility_flags: [
 			"nodejs_compat",
 			"nodejs_compat_populate_process_env",

@@ -35,6 +35,8 @@ export type AppflareConfig<
 	wranglerOutPath?: string;
 	/** Optional override for wrangler.json main entrypoint. Defaults to ./server/index.ts in the generated worker. */
 	wranglerMain?: string;
+	/** Optional override for wrangler.json compatibility_date. Defaults to current date. */
+	wranglerCompatibilityDate?: string;
 	/** Optional CORS whitelist for generated Worker entrypoint. */
 	corsOrigin?: string | string[];
 	auth?: AppflareAuthConfig<Options>;

@@ -90,4 +90,5 @@ export default {
 	},
 	wranglerOutPath: "../../apps/backend/wrangler.json",
 	wranglerMain: "./src/index.ts",
+	wranglerCompatibilityDate: "2025-12-10",
 } as AppflareConfig;
