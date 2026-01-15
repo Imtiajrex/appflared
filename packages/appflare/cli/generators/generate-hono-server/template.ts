@@ -7,6 +7,7 @@ export type ServerTemplateParams = {
 	authMountBlock: string;
 	authResolverBlock: string;
 	routeLines: string[];
+	httpLines: string[];
 };
 
 export function renderServerTemplate(params: ServerTemplateParams): string {
@@ -338,13 +339,15 @@ ${params.authSetupBlock}${params.authMountBlock}${params.authResolverBlock}\tcon
 		return merged as AppflareServerContext;
 	};
 
-\t${params.routeLines.join("\n\n\t")}
+		${params.routeLines.join("\n\n\t")}
 
-\treturn app;
+	${params.httpLines.join("\n\n\t")}
+
+	return app;
 }
 
 function createMutationNotifier(
-\toptions?: RealtimeOptions
+	options?: RealtimeOptions
 ): MutationNotifier | undefined {
 \tif (!options) return undefined;
 \tif (options.notify) return options.notify;

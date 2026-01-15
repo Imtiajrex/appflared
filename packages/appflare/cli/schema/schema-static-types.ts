@@ -676,4 +676,18 @@ export interface InternalMutationDefinition<
 export const internalMutation = <TArgs extends QueryArgsShape, TResult>(
 	definition: InternalMutationDefinition<TArgs, TResult>
 ): InternalMutationDefinition<TArgs, TResult> => definition;
+
+export interface HttpContext extends AppflareAuthContext {
+	db: DatabaseWriter;
+	scheduler?: Scheduler;
+	error: AppflareErrorFactory;
+}
+
+export interface HttpDefinition {
+	handler: (ctx: HttpContext, request: Request) => Promise<Response>;
+}
+
+export const http = (
+	definition: HttpDefinition
+): HttpDefinition => definition;
 `;

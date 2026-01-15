@@ -50,7 +50,8 @@ export type HandlerKind =
 	| "internalQuery"
 	| "internalMutation"
 	| "scheduler"
-	| "cron";
+	| "cron"
+	| "http";
 
 export type DiscoveredHandler = {
 	fileName: string;

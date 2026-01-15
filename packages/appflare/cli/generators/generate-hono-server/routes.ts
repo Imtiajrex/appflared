@@ -78,3 +78,38 @@ export function buildRouteLines(params: {
 	}
 	return routeLines;
 }
+
+export function buildHttpRouteLines(params: {
+	https: DiscoveredHandler[];
+	localNameFor: (handler: DiscoveredHandler) => string;
+}): string[] {
+	const routeLines: string[] = [];
+	for (const hook of params.https) {
+		const local = params.localNameFor(hook);
+		routeLines.push(
+			`app.all(\n` +
+				`	${JSON.stringify(`/http/${hook.routePath}/${hook.name}`)},\n` +
+				`	async (c) => {\n` +
+				`\t\ttry {\n` +
+				`\t\t\tconst ctx = await resolveContext(c);\n` +
+				`\t\t\tconst result = await runHandlerWithMiddleware(\n` +
+				`\t\t\t\t${local} as any,\n` +
+				`\t\t\t\tctx as any,\n` +
+				`\t\t\t\tc.req.raw\n` +
+				`\t\t\t);\n` +
+				`\t\t\tif (isHandlerError(result)) {\n` +
+				`\t\t\t\tconst { status, body } = formatHandlerError(result);\n` +
+				`\t\t\t\treturn c.json(body as any, status);\n` +
+				`\t\t\t}\n` +
+				`\t\t\treturn result;\n` +
+				`\t\t} catch (err) {\n` +
+				`\t\t\tconst { status, body } = formatHandlerError(err);\n` +
+				`\t\t\tconsole.error("Appflare http handler error", err);\n` +
+				`\t\t\treturn c.json(body as any, status);\n` +
+				`\t\t}\n` +
+				`\t}\n` +
+				`);`
+		);
+	}
+	return routeLines;
+}

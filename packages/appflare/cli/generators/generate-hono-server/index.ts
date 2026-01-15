@@ -1,7 +1,7 @@
 import type { AppflareConfig, DiscoveredHandler } from "../../utils/utils";
 import { buildImportSection } from "./imports";
 import { buildAuthSection } from "./auth";
-import { buildRouteLines } from "./routes";
+import { buildRouteLines, buildHttpRouteLines } from "./routes";
 import { renderServerTemplate } from "./template";
 
 export type GenerateHonoServerParams = {
@@ -17,6 +17,9 @@ export function generateHonoServer(params: GenerateHonoServerParams): string {
 	const mutations = params.handlers.filter(
 		(handler) => handler.kind === "mutation"
 	);
+	const https = params.handlers.filter(
+		(handler) => handler.kind === "http"
+	);
 
 	const imports = buildImportSection({
 		handlers: params.handlers,
@@ -30,6 +33,10 @@ export function generateHonoServer(params: GenerateHonoServerParams): string {
 		mutations,
 		localNameFor: imports.localNameFor,
 	});
+	const httpLines = buildHttpRouteLines({
+		https,
+		localNameFor: imports.localNameFor,
+	});
 
 	return renderServerTemplate({
 		schemaImportPath: imports.schemaImportPath,
@@ -40,5 +47,6 @@ export function generateHonoServer(params: GenerateHonoServerParams): string {
 		authMountBlock: auth.mountBlock,
 		authResolverBlock: auth.resolverBlock,
 		routeLines,
+		httpLines,
 	});
 }
