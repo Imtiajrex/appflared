@@ -5,7 +5,7 @@ import { getZodObjectShape, renderField } from "../utils/zod-utils";
 
 function generateDocParts(
 	tableNames: string[],
-	schema: any
+	schema: any,
 ): {
 	docInterfaces: string[];
 	docMapEntries: string[];
@@ -40,13 +40,13 @@ function generateDocParts(
 }
 
 export async function getSchemaTableNames(
-	schemaPathAbs: string
+	schemaPathAbs: string,
 ): Promise<string[]> {
 	const mod = await import(pathToFileURL(schemaPathAbs).href);
 	const schema = mod?.default ?? mod;
 	if (!schema || typeof schema !== "object") {
 		throw new Error(
-			`Invalid schema export in ${schemaPathAbs} (expected default export object)`
+			`Invalid schema export in ${schemaPathAbs} (expected default export object)`,
 		);
 	}
 	return Object.keys(schema).sort();
@@ -61,7 +61,7 @@ export async function generateSchemaTypes(params: {
 	const schema = mod?.default ?? mod;
 	if (!schema || typeof schema !== "object") {
 		throw new Error(
-			`Invalid schema export in ${params.schemaPathAbs} (expected default export object)`
+			`Invalid schema export in ${params.schemaPathAbs} (expected default export object)`,
 		);
 	}
 
@@ -72,7 +72,7 @@ export async function generateSchemaTypes(params: {
 
 	const { docInterfaces, docMapEntries, tableIndexEntries } = generateDocParts(
 		tableNames,
-		schema
+		schema,
 	);
 
 	const configImportPath =
@@ -130,7 +130,7 @@ export type AnyValidator = SchemaValidator<unknown>;
 
 export type TableNames = ${tableNames.map((t) => JSON.stringify(t)).join(" | ")};
 
-export type Id<TableName extends TableNames> = string & { __table?: TableName };
+export type Id<TableName extends TableNames> = string & { __table: TableName };
 
 ${docInterfaces.join("\n\n")}
 

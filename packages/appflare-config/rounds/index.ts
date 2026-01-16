@@ -18,6 +18,7 @@ export const getTickets = query({
 			where: args.id ? { _id: args.id } : undefined,
 			include: { roombas: true, user: true },
 		});
+		result?.[0]?.roombas;
 		const res = await ctx.db.tickets.aggregate({
 			avg: ["stock"],
 			sum: ["stock"],

@@ -13,6 +13,16 @@ type NumericKeys<T> =
 	{
 		[K in keyof T]: NonNil<T[K]> extends number | bigint ? K : never;
 	}[keyof T] & string;
+ 
+type Friendly<T> = T extends Id<any>
+	? T | string
+	: T extends Array<infer TItem>
+		? Array<Friendly<TItem>>
+		: T;
+ 
+type FriendlyDoc<TDoc> = {
+	[K in keyof TDoc]: Friendly<TDoc[K]>;
+};
 
 type PopulateValue<T> = T extends Id<infer TTable>
 	? (TTable extends TableNames ? Doc<TTable> : never)
@@ -53,16 +63,16 @@ type RegexOperand<T> = NonNil<T> extends string
 type ArrayOperand<T> = ReadonlyArray<NonNil<T>>;
 
 type QueryWhereField<T> =
-	| NonNil<T>
+	| Friendly<NonNil<T>>
 	| {
-			eq?: NonNil<T>;
-			$eq?: NonNil<T>;
-			ne?: NonNil<T>;
-			$ne?: NonNil<T>;
-			in?: ArrayOperand<T>;
-			$in?: ArrayOperand<T>;
-			nin?: ArrayOperand<T>;
-			$nin?: ArrayOperand<T>;
+			eq?: Friendly<NonNil<T>>;
+			$eq?: Friendly<NonNil<T>>;
+			ne?: Friendly<NonNil<T>>;
+			$ne?: Friendly<NonNil<T>>;
+			in?: ReadonlyArray<Friendly<NonNil<T>>>;
+			$in?: ReadonlyArray<Friendly<NonNil<T>>>;
+			nin?: ReadonlyArray<Friendly<NonNil<T>>>;
+			$nin?: ReadonlyArray<Friendly<NonNil<T>>>;
 			gt?: Comparable<T>;
 			$gt?: Comparable<T>;
 			gte?: Comparable<T>;
@@ -605,9 +615,8 @@ export const query = <TArgs extends QueryArgsShape, TResult>(
 	definition: QueryDefinition<TArgs, TResult>
 ): QueryDefinition<TArgs, TResult> => definition;
 
-export type EditableDoc<TableName extends TableNames> = Omit<
-	TableDocMap[TableName],
-	"_id" | "_creationTime"
+export type EditableDoc<TableName extends TableNames> = FriendlyDoc<
+	Omit<TableDocMap[TableName], "_id" | "_creationTime">
 >;
 
 export interface DatabaseWriter extends DatabaseReader {}
