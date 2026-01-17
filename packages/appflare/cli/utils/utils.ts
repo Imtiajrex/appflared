@@ -39,6 +39,13 @@ export type AppflareConfig<
 	wranglerCompatibilityDate?: string;
 	/** Optional CORS whitelist for generated Worker entrypoint. */
 	corsOrigin?: string | string[];
+	/** Optional wrangler.json overrides. */
+	wrangler?: {
+		name?: string;
+		main?: string;
+		compatibilityDate?: string;
+		[key: string]: unknown;
+	};
 	auth?: AppflareAuthConfig<Options>;
 	storage?: AppflareStorageConfig;
 	scheduler?: AppflareSchedulerConfig;
@@ -66,7 +73,7 @@ export type DiscoveredHandler = {
 export function pascalCase(value: string): string {
 	return value
 		.replace(/(^|[^A-Za-z0-9]+)([A-Za-z0-9])/g, (_, __, c: string) =>
-			c.toUpperCase()
+			c.toUpperCase(),
 		)
 		.replace(/[^A-Za-z0-9]/g, "");
 }
@@ -77,7 +84,7 @@ export function isValidIdentifier(value: string): boolean {
 
 export function groupBy<T, TKey>(
 	items: T[],
-	keyFn: (item: T) => TKey
+	keyFn: (item: T) => TKey,
 ): Map<TKey, T[]> {
 	const map = new Map<TKey, T[]>();
 	for (const item of items) {
@@ -93,7 +100,7 @@ export function groupBy<T, TKey>(
 
 export function toImportPathFromGeneratedSrc(
 	outDirAbs: string,
-	fileAbs: string
+	fileAbs: string,
 ): string {
 	const fromDir = path.join(outDirAbs, "src");
 	let rel = path.relative(fromDir, fileAbs);
@@ -107,7 +114,7 @@ export function toImportPathFromGeneratedSrc(
 
 export function toImportPathFromGeneratedServer(
 	outDirAbs: string,
-	fileAbs: string
+	fileAbs: string,
 ): string {
 	const fromDir = path.join(outDirAbs, "server");
 	let rel = path.relative(fromDir, fileAbs);
@@ -121,7 +128,7 @@ export function toImportPathFromGeneratedServer(
 
 export async function assertFileExists(
 	fileAbs: string,
-	message: string
+	message: string,
 ): Promise<void> {
 	const ok = await fileExists(fileAbs);
 	if (!ok) throw new Error(message);
@@ -129,7 +136,7 @@ export async function assertFileExists(
 
 export async function assertDirExists(
 	dirAbs: string,
-	message: string
+	message: string,
 ): Promise<void> {
 	try {
 		const stat = await fs.stat(dirAbs);
@@ -150,7 +157,7 @@ export async function fileExists(fileAbs: string): Promise<boolean> {
 
 export async function walkTsFiles(
 	rootAbs: string,
-	ignoreDirs: Set<string>
+	ignoreDirs: Set<string>,
 ): Promise<string[]> {
 	const out: string[] = [];
 	const entries = await fs.readdir(rootAbs, { withFileTypes: true });

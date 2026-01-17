@@ -39,9 +39,11 @@ export function generateWranglerJson(params: {
 
 	const wrangler: Record<string, unknown> = {
 		$schema: "node_modules/wrangler/config-schema.json",
-		name: sanitizeWorkerName(params.configDirAbs),
-		main: workerMain,
-		compatibility_date: compatibilityDate,
+		name:
+			params.config.wrangler?.name ?? sanitizeWorkerName(params.configDirAbs),
+		main: params.config.wrangler?.main ?? workerMain,
+		compatibility_date:
+			params.config.wrangler?.compatibilityDate ?? compatibilityDate,
 		compatibility_flags: [
 			"nodejs_compat",
 			"nodejs_compat_populate_process_env",
@@ -64,6 +66,7 @@ export function generateWranglerJson(params: {
 		vars: {
 			ALLOWED_ORIGINS: allowedOrigins.join(","),
 		},
+		...params.config.wrangler,
 	};
 
 	if (r2Buckets && r2Buckets.length > 0) {

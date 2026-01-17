@@ -40,7 +40,7 @@ export function createBetterAuthRouter<
 }
 
 export function initBetterAuth<Options extends BetterAuthOptions>(
-	options: Options
+	options: Options,
 ): Auth<Options> {
 	return betterAuth({
 		...options,
@@ -53,7 +53,7 @@ export const getHeaders = (headers: Headers) => {
 	const headerObject: Record<string, any> = {};
 	for (const key in newHeaders) {
 		const isAuthorization =
-			key.toLowerCase() === "authorization" && newHeaders[key]?.Length > 7;
+			key.toLowerCase() === "authorization" && newHeaders[key]?.length > 7;
 		if (isAuthorization) {
 			if (key !== "cookie") {
 				headerObject[key] = newHeaders[key];

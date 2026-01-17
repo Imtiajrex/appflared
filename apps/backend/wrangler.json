@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "appflare-config",
+  "name": "testers",
   "main": "./src/index.ts",
   "compatibility_date": "2025-12-10",
   "compatibility_flags": [
@@ -42,6 +42,7 @@
   "vars": {
     "ALLOWED_ORIGINS": "http://localhost:3000"
   },
+  "compatibilityDate": "2025-12-10",
   "r2_buckets": [
     {
       "binding": "APPFLARE_STORAGE",
