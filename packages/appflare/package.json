@@ -1,6 +1,6 @@
 {
 	"name": "appflare",
-	"version": "0.0.21",
+	"version": "0.0.22",
 	"bin": {
 		"appflare": "./cli/index.ts"
 	},
