@@ -47,26 +47,37 @@ export function initBetterAuth<Options extends BetterAuthOptions>(
 		database: mongodbAdapter(getDatabase((env as any).MONGO_DB) as any),
 	});
 }
-
 export const getHeaders = (headers: Headers) => {
 	const newHeaders = Object.fromEntries(headers as any);
 	const headerObject: Record<string, any> = {};
+	let hasCookie = false;
+
+	for (const key in newHeaders) {
+		if (key.toLowerCase() === "cookie") {
+			hasCookie = true;
+			break;
+		}
+	}
+
 	for (const key in newHeaders) {
 		const isAuthorization =
-			key.toLowerCase() === "authorization" && newHeaders[key]?.length > 7;
-		if (isAuthorization) {
-			if (key !== "cookie") {
-				headerObject[key] = newHeaders[key];
-			}
-		} else {
-			if (key !== "authorization") {
-				headerObject[key] = newHeaders[key];
-			}
+			key.toLowerCase() === "authorization" &&
+			newHeaders[key]?.includes("Bearer");
+
+		if (hasCookie && key.toLowerCase() === "authorization") {
+			continue;
 		}
+
+		if (key.toLowerCase() === "authorization" && !isAuthorization) {
+			continue;
+		}
+
+		headerObject[key] = newHeaders[key];
 	}
 
 	return headerObject as any as Headers;
 };
+
 export const getSanitizedRequest = (req: Request) => {
 	const newRequest = new Request(req, {
 		headers: getHeaders(req.headers),
