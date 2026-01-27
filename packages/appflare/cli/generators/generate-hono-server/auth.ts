@@ -58,7 +58,7 @@ export function buildAuthSection(config: AppflareConfig): AuthSection {
 				`\t}`,
 				``,
 				`\tconst sessionResult = await __appflareAuth.api.getSession(`,
-				`\t\tgetSanitizedRequest(c.req.raw)`,
+				`\t\(c.req.raw)`,
 				`\t);`,
 				`\tconst authContext: AppflareAuthContext = {`,
 				`\t\tsession:`,
