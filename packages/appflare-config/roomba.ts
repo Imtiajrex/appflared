@@ -7,10 +7,11 @@ export const getRoombas = query({
 	},
 	handler: async (ctx, args) => {
 		const userId = ctx?.user?.id;
-		return ctx.db.roombas.findMany({
+		const roombas = await ctx.db.roombas.findMany({
 			where: args.id ? { _id: args.id } : undefined,
 			include: { owner: true },
 		});
+		return roombas;
 	},
 });
 

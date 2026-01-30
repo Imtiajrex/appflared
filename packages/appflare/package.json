@@ -13,6 +13,7 @@
 		"./react/*": "./react/*.ts",
 		"./react": "./react/index.ts",
 		"./server/db": "./server/db.ts",
+		"./server/database": "./server/database/index.ts",
 		"./server/storage": "./server/storage.ts",
 		"./server/auth": "./server/auth.ts"
 	},

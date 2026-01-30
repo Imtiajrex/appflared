@@ -2,6 +2,108 @@
 
 Appflare's server package provides a small MongoDB data layer with typed helpers for querying, writing, and populating referenced documents inferred from your schema. The entrypoint is `createMongoDbContext`, which builds per-table clients that expose a Prisma-like API (`findMany`, `create`, `update`, `delete`, etc.).
 
+---
+
+# Appflare Server (D1/Prisma) Module
+
+Appflare also supports Cloudflare D1 databases using Prisma ORM. This provides a typed database context that wraps a Prisma client configured with the `@prisma/adapter-d1` driver.
+
+## Required Dependencies
+
+Install these packages in your project:
+
+```bash
+npm install @prisma/client @prisma/adapter-d1
+npm install -D prisma
+```
+
+## Prisma Schema Setup
+
+Configure your `prisma/schema.prisma` with D1 support:
+
+```prisma
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+}
+```
+
+## Quick Start (D1/Prisma)
+
+```ts
+import { createD1PrismaContext } from "appflare/server/database";
+import { PrismaClient } from "@prisma/client";
+
+// In your Cloudflare Worker handler
+export default {
+	async fetch(request: Request, env: Env) {
+		const db = createD1PrismaContext(
+			{ d1: env.DB },
+			(adapter) => new PrismaClient({ adapter }),
+		);
+
+		// Use Prisma as usual
+		const users = await db.user.findMany();
+		return Response.json(users);
+	},
+};
+```
+
+## D1 Database Setup
+
+1. Create D1 database:
+
+   ```bash
+   npx wrangler d1 create my-database
+   ```
+
+2. Add to `wrangler.toml`:
+
+   ```toml
+   [[d1_databases]]
+   binding = "DB"
+   database_name = "my-database"
+   database_id = "<your-database-id>"
+   ```
+
+3. Generate and apply migrations:
+   ```bash
+   npx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script > migrations/0001_init.sql
+   npx wrangler d1 execute my-database --local --file=./migrations/0001_init.sql
+   npx wrangler d1 execute my-database --remote --file=./migrations/0001_init.sql
+   ```
+
+## Using with Generated Server (D1)
+
+When using the D1 server template, provide a D1 binding:
+
+```ts
+import { createAppflareHonoServer } from "./server";
+
+export default {
+	fetch(request: Request, env: Env) {
+		const app = createAppflareHonoServer({
+			getD1: () => env.DB,
+		});
+		return app.fetch(request, env);
+	},
+};
+```
+
+---
+
 ## Directory Map
 
 - `db.ts`: Public exports for the module (re-exports context and types).
@@ -99,7 +201,7 @@ app.route(
 				cacheControl: "public, max-age=3600",
 			},
 		],
-	})
+	}),
 );
 
 export default app;

@@ -2,7 +2,7 @@ import type { AppflareConfig, DiscoveredHandler } from "../../utils/utils";
 import { buildImportSection } from "./imports";
 import { buildAuthSection } from "./auth";
 import { buildRouteLines, buildHttpRouteLines } from "./routes";
-import { renderServerTemplate } from "./template";
+import { renderD1ServerTemplate as renderServerTemplate } from "./template-d1";
 
 export type GenerateHonoServerParams = {
 	handlers: DiscoveredHandler[];
@@ -15,11 +15,9 @@ export type GenerateHonoServerParams = {
 export function generateHonoServer(params: GenerateHonoServerParams): string {
 	const queries = params.handlers.filter((handler) => handler.kind === "query");
 	const mutations = params.handlers.filter(
-		(handler) => handler.kind === "mutation"
+		(handler) => handler.kind === "mutation",
 	);
-	const https = params.handlers.filter(
-		(handler) => handler.kind === "http"
-	);
+	const https = params.handlers.filter((handler) => handler.kind === "http");
 
 	const imports = buildImportSection({
 		handlers: params.handlers,
@@ -48,5 +46,6 @@ export function generateHonoServer(params: GenerateHonoServerParams): string {
 		authResolverBlock: auth.resolverBlock,
 		routeLines,
 		httpLines,
+		prismaClientImportPath: "@prisma/client",
 	});
 }
