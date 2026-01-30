@@ -62,6 +62,12 @@
       }
     ]
   },
+  "kv_namespaces": [
+    {
+      "binding": "APPFLARE_KV",
+      "id": "51ab2d7674b5490d9a34de6c14577f7e"
+    }
+  ],
   "triggers": {
     "crons": [
       "*/1 * * * *"

@@ -89,6 +89,15 @@ export function generateWranglerJson(params: {
 		};
 	}
 
+	if (params.config.storage?.kvBinding) {
+		wrangler.kv_namespaces = [
+			{
+				binding: params.config.storage.kvBinding,
+				id: params.config.storage.kvId ?? "",
+			},
+		];
+	}
+
 	if (params.cronTriggers && params.cronTriggers.length > 0) {
 		wrangler.triggers = {
 			crons: Array.from(new Set(params.cronTriggers)),

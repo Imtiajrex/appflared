@@ -76,7 +76,9 @@ const storage = {
 	basePath: "/storage",
 	bucketBinding: "APPFLARE_STORAGE",
 	rules: storageRules,
-};
+	kvBinding: "APPFLARE_KV",
+	kvId: "51ab2d7674b5490d9a34de6c14577f7e",
+} as AppflareConfig["storage"];
 
 export default {
 	dir: "./",

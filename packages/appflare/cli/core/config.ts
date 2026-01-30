@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url";
 import { AppflareConfig, assertFileExists } from "../utils/utils";
 
 export async function loadConfig(
-	configPathAbs: string
+	configPathAbs: string,
 ): Promise<{ config: AppflareConfig; configDirAbs: string }> {
 	await assertFileExists(configPathAbs, `Config not found: ${configPathAbs}`);
 	const configDirAbs = path.dirname(configPathAbs);
@@ -13,7 +13,7 @@ export async function loadConfig(
 	const config = (mod?.default ?? mod) as Partial<AppflareConfig>;
 	if (!config || typeof config !== "object") {
 		throw new Error(
-			`Invalid config export in ${configPathAbs} (expected default export object)`
+			`Invalid config export in ${configPathAbs} (expected default export object)`,
 		);
 	}
 	if (typeof config.dir !== "string" || !config.dir) {
@@ -61,7 +61,7 @@ export async function loadConfig(
 			typeof storage.bucketBinding !== "string"
 		) {
 			throw new Error(
-				`Invalid config.storage.bucketBinding in ${configPathAbs}`
+				`Invalid config.storage.bucketBinding in ${configPathAbs}`,
 			);
 		}
 		if (
@@ -69,8 +69,17 @@ export async function loadConfig(
 			typeof storage.defaultCacheControl !== "string"
 		) {
 			throw new Error(
-				`Invalid config.storage.defaultCacheControl in ${configPathAbs}`
+				`Invalid config.storage.defaultCacheControl in ${configPathAbs}`,
 			);
+		}
+		if (
+			storage.kvBinding !== undefined &&
+			typeof storage.kvBinding !== "string"
+		) {
+			throw new Error(`Invalid config.storage.kvBinding in ${configPathAbs}`);
+		}
+		if (storage.kvId !== undefined && typeof storage.kvId !== "string") {
+			throw new Error(`Invalid config.storage.kvId in ${configPathAbs}`);
 		}
 	}
 	return { config: config as AppflareConfig, configDirAbs };

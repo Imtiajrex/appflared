@@ -10,11 +10,15 @@ export type AppflareAuthConfig<
 	basePath?: string;
 	options?: Options;
 };
-
 export type AppflareStorageConfig<
 	Env = unknown,
 	Principal = unknown,
-> = StorageManagerOptions<Env, Principal>;
+> = StorageManagerOptions<Env, Principal> & {
+	/** Optional KV binding name created in the generated worker. */
+	kvBinding?: string;
+	/** Optional KV namespace ID used in wrangler.json. */
+	kvId?: string;
+};
 
 export type AppflareSchedulerConfig = {
 	/** Set to false to disable scheduler generation. */
