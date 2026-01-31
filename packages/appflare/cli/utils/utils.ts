@@ -1,14 +1,19 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { BetterAuthOptions } from "better-auth";
+import type { BetterAuthClientOptions } from "better-auth/client";
 import type { StorageManagerOptions } from "../../server/storage/types";
 
 export type AppflareAuthConfig<
-	Options extends BetterAuthOptions = BetterAuthOptions,
+	Options extends BetterAuthOptions,
+	ClientOptions extends BetterAuthClientOptions,
 > = {
 	enabled?: boolean;
 	basePath?: string;
+	/** Server-side Better Auth options. */
 	options?: Options;
+	/** Client-side Better Auth options used in the generated API client. */
+	clientOptions?: ClientOptions;
 };
 export type AppflareStorageConfig<
 	Env = unknown,
@@ -31,6 +36,7 @@ export type AppflareSchedulerConfig = {
 
 export type AppflareConfig<
 	Options extends BetterAuthOptions = BetterAuthOptions,
+	ClientOptions extends BetterAuthClientOptions = BetterAuthClientOptions,
 > = {
 	dir: string;
 	schema: string;
@@ -50,7 +56,7 @@ export type AppflareConfig<
 		compatibilityDate?: string;
 		[key: string]: unknown;
 	};
-	auth?: AppflareAuthConfig<Options>;
+	auth?: AppflareAuthConfig<Options, ClientOptions>;
 	storage?: AppflareStorageConfig;
 	scheduler?: AppflareSchedulerConfig;
 };

@@ -38,7 +38,7 @@ import type {
 	InternalQueryContext,
 	InternalQueryDefinition,
 } from "./schema-types";
-
+{{configImport}}
 `;
 
 const TYPE_DEFINITIONS_TEMPLATE = `
@@ -286,11 +286,13 @@ export type QueriesClient = {{queriesTypeDef}};
 
 export type MutationsClient = {{mutationsTypeDef}};
 
+{{authClientTypeDefinitions}}
+
 export type AppflareApiClient = {
 	queries: QueriesClient;
 	mutations: MutationsClient;
 	storage: StorageManagerClient;
-	auth?: ReturnType<typeof createAuthClient>;
+	auth?: AppflareAuthClient;
 };
 
 export type AppflareApiOptions = {
@@ -298,10 +300,10 @@ export type AppflareApiOptions = {
 	fetcher?: RequestExecutor;
 	realtime?: RealtimeConfig;
 	storage?: StorageManagerOptions;
-	auth?: false | (BetterAuthClientOptions & { baseURL?: string });
+	auth?: (BetterAuthClientOptions & { baseURL?: string });
 };
 
-export function createAppflareApi(options: AppflareApiOptions = {}): AppflareApiClient {
+export function createAppflareApi(options: AppflareApiOptions = {}) {
 	const baseUrl = normalizeBaseUrl(options.baseUrl);
 	const request = options.fetcher ?? defaultFetcher;
 	const realtime = resolveRealtimeConfig(baseUrl, options.realtime);
@@ -309,14 +311,7 @@ export function createAppflareApi(options: AppflareApiOptions = {}): AppflareApi
 	const mutations: MutationsClient = {{mutationsInit}};
 	const storage = createStorageManagerClient(baseUrl, request, options.storage);
 	const authBasePath = normalizeAuthBasePath({{authBasePath}}) ?? "/auth";
-	const auth = options.auth === false
-		? undefined
-		: createAuthClient({
-			...(options.auth ?? {}),
-			baseURL:
-				(options.auth as any)?.baseURL ??
-				buildUrl(baseUrl, authBasePath),
-		});
+{{authClientInit}}
 	return { queries, mutations, storage, auth };
 }
 
@@ -675,7 +670,7 @@ function generateImports(params: {
 }): { importLines: string[]; importAliasBySource: Map<string, string> } {
 	const handlerImportsGrouped = groupBy(
 		params.handlers,
-		(h) => h.sourceFileAbs
+		(h) => h.sourceFileAbs,
 	);
 
 	const importLines: string[] = [];
@@ -685,7 +680,7 @@ function generateImports(params: {
 		importAliasBySource.set(fileAbs, alias);
 		const importPath = toImportPathFromGeneratedSrc(params.outDirAbs, fileAbs);
 		importLines.push(
-			`import * as ${alias} from ${JSON.stringify(importPath)};`
+			`import * as ${alias} from ${JSON.stringify(importPath)};`,
 		);
 	}
 	return { importLines, importAliasBySource };
@@ -701,7 +696,7 @@ function generateGroupedHandlers(handlers: DiscoveredHandler[]): {
 	const mutations = handlers.filter((h) => h.kind === "mutation");
 	const internalQueries = handlers.filter((h) => h.kind === "internalQuery");
 	const internalMutations = handlers.filter(
-		(h) => h.kind === "internalMutation"
+		(h) => h.kind === "internalMutation",
 	);
 
 	const queriesByFile = groupBy(queries, (h) => h.routePath);
@@ -709,7 +704,7 @@ function generateGroupedHandlers(handlers: DiscoveredHandler[]): {
 	const internalQueriesByFile = groupBy(internalQueries, (h) => h.routePath);
 	const internalMutationsByFile = groupBy(
 		internalMutations,
-		(h) => h.routePath
+		(h) => h.routePath,
 	);
 
 	return {
@@ -725,7 +720,7 @@ function generateTypeDefs(
 	mutationsByFile: Map<string, DiscoveredHandler[]>,
 	internalQueriesByFile: Map<string, DiscoveredHandler[]>,
 	internalMutationsByFile: Map<string, DiscoveredHandler[]>,
-	importAliasBySource: Map<string, string>
+	importAliasBySource: Map<string, string>,
 ): {
 	queriesTypeDef: string;
 	mutationsTypeDef: string;
@@ -736,11 +731,11 @@ function generateTypeDefs(
 	const mutationsTypeLines = generateMutationsTypeLines(mutationsByFile);
 	const internalQueriesTypeLines = generateInternalTypeLines(
 		internalQueriesByFile,
-		importAliasBySource
+		importAliasBySource,
 	);
 	const internalMutationsTypeLines = generateInternalTypeLines(
 		internalMutationsByFile,
-		importAliasBySource
+		importAliasBySource,
 	);
 
 	const queriesTypeDef =
@@ -767,15 +762,15 @@ function generateTypeDefs(
 function generateClientInits(
 	queriesByFile: Map<string, DiscoveredHandler[]>,
 	mutationsByFile: Map<string, DiscoveredHandler[]>,
-	importAliasBySource: Map<string, string>
+	importAliasBySource: Map<string, string>,
 ): { queriesInit: string; mutationsInit: string } {
 	const queriesClientLines = generateQueriesClientLines(
 		queriesByFile,
-		importAliasBySource
+		importAliasBySource,
 	);
 	const mutationsClientLines = generateMutationsClientLines(
 		mutationsByFile,
-		importAliasBySource
+		importAliasBySource,
 	);
 
 	const queriesInit =
@@ -788,12 +783,12 @@ function generateClientInits(
 
 function generateInternalInit(
 	internalByFile: Map<string, DiscoveredHandler[]>,
-	importAliasBySource: Map<string, string>
+	importAliasBySource: Map<string, string>,
 ): string {
 	if (internalByFile.size === 0) return "{}";
 	const lines: string[] = [];
 	for (const [fileName, list] of Array.from(internalByFile.entries()).sort(
-		(a, b) => a[0].localeCompare(b[0])
+		(a, b) => a[0].localeCompare(b[0]),
 	)) {
 		const fileKey = renderObjectKey(fileName);
 		const inner = list
@@ -813,19 +808,19 @@ ${lines.join("\n")}
 
 function generateInternalMeta(
 	internalByFile: Map<string, DiscoveredHandler[]>,
-	importAliasBySource: Map<string, string>
+	importAliasBySource: Map<string, string>,
 ): string {
 	if (internalByFile.size === 0) return "";
 	const lines: string[] = [];
 	for (const [fileName, list] of Array.from(internalByFile.entries()).sort(
-		(a, b) => a[0].localeCompare(b[0])
+		(a, b) => a[0].localeCompare(b[0]),
 	)) {
 		for (const h of list.slice().sort((a, b) => a.name.localeCompare(b.name))) {
 			const alias = importAliasBySource.get(h.sourceFileAbs)!;
 			lines.push(
 				`{ file: ${JSON.stringify(fileName)}, name: ${JSON.stringify(
-					h.name
-				)}, handler: ${alias}.${h.name} },`
+					h.name,
+				)}, handler: ${alias}.${h.name} },`,
 			);
 		}
 	}
@@ -836,6 +831,8 @@ export function generateApiClient(params: {
 	handlers: DiscoveredHandler[];
 	outDirAbs: string;
 	authBasePath?: string;
+	authEnabled?: boolean;
+	configPathAbs?: string;
 }): string {
 	const { importLines, importAliasBySource } = generateImports(params);
 	const {
@@ -854,12 +851,12 @@ export function generateApiClient(params: {
 		mutationsByFile,
 		internalQueriesByFile,
 		internalMutationsByFile,
-		importAliasBySource
+		importAliasBySource,
 	);
 	const { queriesInit, mutationsInit } = generateClientInits(
 		queriesByFile,
 		mutationsByFile,
-		importAliasBySource
+		importAliasBySource,
 	);
 	const internalHandlersCombined = new Map<string, DiscoveredHandler[]>();
 	for (const [file, list] of Array.from(internalQueriesByFile.entries())) {
@@ -871,29 +868,65 @@ export function generateApiClient(params: {
 	}
 	const internalInit = generateInternalInit(
 		internalHandlersCombined,
-		importAliasBySource
+		importAliasBySource,
 	);
 	const internalQueriesMeta = generateInternalMeta(
 		internalQueriesByFile,
-		importAliasBySource
+		importAliasBySource,
 	);
 	const internalMutationsMeta = generateInternalMeta(
 		internalMutationsByFile,
-		importAliasBySource
+		importAliasBySource,
 	);
 
 	const authBasePathLiteral = JSON.stringify(params.authBasePath ?? "/auth");
 
+	// Generate config import and auth client options handling
+	let configImport = "";
+	let authClientTypeDefinitions =
+		"type AppflareAuthClient = ReturnType<typeof createAuthClient>;";
+	let authClientInit = `	const auth = createAuthClient({
+			...(options.auth ?? {}),
+			baseURL:
+				(options.auth as any)?.baseURL ??
+				buildUrl(baseUrl, authBasePath),
+		});`;
+
+	if (params.authEnabled && params.configPathAbs) {
+		const configImportPath = toImportPathFromGeneratedSrc(
+			params.outDirAbs,
+			params.configPathAbs,
+		);
+		configImport = `\nimport __appflareConfig from ${JSON.stringify(configImportPath)};`;
+
+		// Use a factory function pattern to properly infer the client type from clientOptions
+		authClientTypeDefinitions = `const __getAppflareAuthClientOptions = () => (__appflareConfig.auth?.clientOptions ?? {}) as const;
+type AppflareAuthClientOptions = ReturnType<typeof __getAppflareAuthClientOptions>;
+const __createTypedAuthClient = (baseURL: string) => createAuthClient({
+	...__getAppflareAuthClientOptions(),
+	baseURL,
+});
+type AppflareAuthClient = ReturnType<typeof __createTypedAuthClient>;`;
+
+		authClientInit = `	const auth =  createAuthClient({
+			...__getAppflareAuthClientOptions(),
+			...(options.auth ?? {}),
+			baseURL:
+				(options.auth as any)?.baseURL ??
+				buildUrl(baseUrl, authBasePath),
+		});`;
+	}
+
 	const typeBlocks = generateTypeBlocks(params.handlers, importAliasBySource);
 
 	return (
-		HEADER_TEMPLATE +
+		HEADER_TEMPLATE.replace("{{configImport}}", configImport) +
 		importLines.join("\n") +
 		TYPE_DEFINITIONS_TEMPLATE +
 		typeBlocks.join("\n\n") +
 		INTERNAL_TEMPLATE.replace(
 			"{{internalQueriesTypeDef}}",
-			internalQueriesTypeDef
+			internalQueriesTypeDef,
 		)
 			.replace("{{internalMutationsTypeDef}}", internalMutationsTypeDef)
 			.replace("{{internalInit}}", internalInit)
@@ -903,7 +936,9 @@ export function generateApiClient(params: {
 			.replace("{{mutationsTypeDef}}", mutationsTypeDef)
 			.replace("{{queriesInit}}", queriesInit)
 			.replace("{{mutationsInit}}", mutationsInit)
-			.replace("{{authBasePath}}", authBasePathLiteral) +
+			.replace("{{authBasePath}}", authBasePathLiteral)
+			.replace("{{authClientTypeDefinitions}}", authClientTypeDefinitions)
+			.replace("{{authClientInit}}", authClientInit) +
 		UTILITY_FUNCTIONS_TEMPLATE
 	);
 }

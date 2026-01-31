@@ -1,9 +1,14 @@
-import type { BetterAuthOptions } from "better-auth";
-import { bearer } from "better-auth/plugins";
-import type { StorageRule } from "appflare/server/storage";
 import type { AppflareConfig } from "appflare";
-import { sendEmail } from "./user";
-import { sendResetEmail, sendVerificationEmail } from "./emails";
+import type { StorageRule } from "appflare/server/storage";
+import type { BetterAuthOptions } from "better-auth";
+import type { BetterAuthClientOptions } from "better-auth/client";
+import { emailOTPClient } from "better-auth/client/plugins";
+import { bearer, emailOTP } from "better-auth/plugins";
+import {
+	sendResetEmail,
+	sendVerificationEmail,
+	sendVerificationOtp,
+} from "./emails";
 
 const authOptions: Partial<BetterAuthOptions> = {
 	trustedOrigins: ["http://localhost:3000"],
@@ -16,69 +21,16 @@ const authOptions: Partial<BetterAuthOptions> = {
 		sendOnSignIn: true,
 		sendOnSignUp: true,
 	},
-	plugins: [bearer()],
+	plugins: [
+		bearer(),
+		emailOTP({
+			sendVerificationOTP: sendVerificationOtp,
+			sendVerificationOnSignUp: true,
+		}),
+	],
 };
 
-const storageRules: StorageRule[] = [
-	{
-		route: "/readonly",
-		methods: ["GET", "HEAD"],
-		cacheControl: "public, max-age=300",
-	},
-	{
-		route: "/readonly",
-		methods: ["PUT", "POST", "DELETE"],
-		authorize: () => ({
-			allow: false,
-			status: 405,
-			message: "Read-only bucket",
-		}),
-	},
-	{
-		route: "/readonly/*",
-		methods: ["GET", "HEAD"],
-		cacheControl: "public, max-age=300",
-	},
-	{
-		route: "/readonly/*",
-		methods: ["PUT", "POST", "DELETE"],
-		authorize: () => ({
-			allow: false,
-			status: 405,
-			message: "Read-only bucket",
-		}),
-	},
-	{
-		route: "/json/*",
-		contentType: () => "application/json",
-	},
-	{
-		route: "/uploads/*",
-		maxSizeBytes: 512 * 1024,
-	},
-	{
-		route: "/users/:userId/*",
-		authorize: ({ params, c }) => {
-			const userId = params.userId;
-			const headerUser = c.req.header("x-user-id");
-			if (headerUser && headerUser === userId) {
-				return { allow: true, principal: headerUser };
-			}
-			return {
-				allow: false,
-				status: 401,
-				message: "x-user-id header required for user bucket",
-			};
-		},
-		deriveKey: ({ params, wildcard }) =>
-			`${params.userId}/${wildcard || "root"}`,
-		cacheControl: "private, max-age=0, must-revalidate",
-	},
-	{
-		// catch-all fallback must be last so more specific rules win
-		route: "/*",
-	},
-];
+const storageRules: StorageRule[] = [];
 
 const storage = {
 	basePath: "/storage",
@@ -97,6 +49,9 @@ export default {
 		enabled: true,
 		basePath: "/api/auth",
 		options: authOptions,
+		clientOptions: {
+			plugins: [emailOTPClient()],
+		},
 	},
 	wranglerOutPath: "../../apps/backend/wrangler.json",
 	wrangler: {
@@ -104,4 +59,4 @@ export default {
 		main: "./src/index.ts",
 		compatibilityDate: "2025-12-10",
 	},
-} as AppflareConfig;
+};

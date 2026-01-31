@@ -39,12 +39,12 @@ program.name("appflare").description("Appflare CLI").version("0.0.0");
 program
 	.command("build")
 	.description(
-		"Generate typed schema + query/mutation client/server into outDir"
+		"Generate typed schema + query/mutation client/server into outDir",
 	)
 	.option(
 		"-c, --config <path>",
 		"Path to appflare.config.ts",
-		"appflare.config.ts"
+		"appflare.config.ts",
 	)
 	.option("--emit", "Also run tsc to emit JS + .d.ts into outDir/dist")
 	.option("-w, --watch", "Watch for changes and rebuild")
@@ -73,7 +73,7 @@ program
 				console.error(message);
 				process.exitCode = 1;
 			}
-		}
+		},
 	);
 
 void main();
@@ -83,7 +83,7 @@ async function main(): Promise<void> {
 }
 
 async function loadConfig(
-	configPathAbs: string
+	configPathAbs: string,
 ): Promise<{ config: AppflareConfig; configDirAbs: string }> {
 	await assertFileExists(configPathAbs, `Config not found: ${configPathAbs}`);
 	const configDirAbs = path.dirname(configPathAbs);
@@ -92,7 +92,7 @@ async function loadConfig(
 	const config = (mod?.default ?? mod) as Partial<AppflareConfig>;
 	if (!config || typeof config !== "object") {
 		throw new Error(
-			`Invalid config export in ${configPathAbs} (expected default export object)`
+			`Invalid config export in ${configPathAbs} (expected default export object)`,
 		);
 	}
 	if (typeof config.dir !== "string" || !config.dir) {
@@ -133,7 +133,7 @@ async function buildFromConfig(params: {
 
 	await assertDirExists(
 		projectDirAbs,
-		`Project dir not found: ${projectDirAbs}`
+		`Project dir not found: ${projectDirAbs}`,
 	);
 	await assertFileExists(schemaPathAbs, `Schema not found: ${schemaPathAbs}`);
 
@@ -143,7 +143,7 @@ async function buildFromConfig(params: {
 	// Re-export the user schema inside the generated output so downstream code can import it from the build directory.
 	const schemaImportPathForGeneratedSrc = toImportPathFromGeneratedSrc(
 		outDirAbs,
-		schemaPathAbs
+		schemaPathAbs,
 	);
 	const schemaReexport = `import schema from ${JSON.stringify(schemaImportPathForGeneratedSrc)};
 export type AppflareGeneratedSchema = typeof schema;
@@ -158,7 +158,7 @@ export default schema;
 	});
 	await fs.writeFile(
 		path.join(outDirAbs, "src", "schema-types.ts"),
-		schemaTypesTs
+		schemaTypesTs,
 	);
 
 	// (Re)generate built-in DB handlers based on the schema tables.
@@ -179,6 +179,8 @@ export default schema;
 			config.auth && config.auth.enabled === false
 				? undefined
 				: (config.auth?.basePath ?? "/auth"),
+		authEnabled: config.auth?.enabled !== false,
+		configPathAbs,
 	});
 	await fs.writeFile(path.join(outDirAbs, "src", "api.ts"), apiTs);
 
@@ -200,7 +202,7 @@ export default schema;
 	});
 	await fs.writeFile(
 		path.join(outDirAbs, "server", "websocket-hibernation-server.ts"),
-		websocketDoTs
+		websocketDoTs,
 	);
 
 	const schedulerTs = generateSchedulerHandlers({
@@ -211,11 +213,11 @@ export default schema;
 	});
 	await fs.writeFile(
 		path.join(outDirAbs, "server", "scheduler.ts"),
-		schedulerTs
+		schedulerTs,
 	);
 
 	const cronHandlersPresent = handlers.some(
-		(handler) => handler.kind === "cron"
+		(handler) => handler.kind === "cron",
 	);
 	const { code: cronTs, cronTriggers } = generateCronHandlers({
 		handlers,
@@ -228,7 +230,7 @@ export default schema;
 	const allowedOrigins = normalizeAllowedOrigins(
 		process.env.APPFLARE_ALLOWED_ORIGINS ??
 			config.corsOrigin ??
-			"http://localhost:3000"
+			"http://localhost:3000",
 	);
 	const workerIndexTs = generateCloudflareWorkerIndex({
 		allowedOrigins,
@@ -297,7 +299,7 @@ async function watchAndBuild(params: {
 
 		lastWatchConfig = normalized;
 		console.log(
-			`[appflare] watching ${normalized.targets.length} path(s) (ignoring ${normalized.ignored.length})`
+			`[appflare] watching ${normalized.targets.length} path(s) (ignoring ${normalized.ignored.length})`,
 		);
 	};
 
@@ -319,7 +321,7 @@ async function watchAndBuild(params: {
 					config,
 					configDirAbs,
 					configPathAbs: params.configPathAbs,
-				})
+				}),
 			);
 			console.log("[appflare] build started");
 			await buildFromConfig({
@@ -384,7 +386,7 @@ function normalizeWatchConfig(config: WatchConfig): WatchConfig {
 	const normalizeList = (list: string[]): string[] =>
 		[
 			...new Set(
-				list.map((item) => (hasGlob(item) ? item : path.resolve(item)))
+				list.map((item) => (hasGlob(item) ? item : path.resolve(item))),
 			),
 		].sort();
 

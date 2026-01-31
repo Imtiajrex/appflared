@@ -32,7 +32,7 @@ export async function buildFromConfig(params: {
 
 	await assertDirExists(
 		projectDirAbs,
-		`Project dir not found: ${projectDirAbs}`
+		`Project dir not found: ${projectDirAbs}`,
 	);
 	await assertFileExists(schemaPathAbs, `Schema not found: ${schemaPathAbs}`);
 
@@ -42,7 +42,7 @@ export async function buildFromConfig(params: {
 	// Re-export the user schema inside the generated output so downstream code can import it from the build directory.
 	const schemaImportPathForGeneratedSrc = toImportPathFromGeneratedSrc(
 		outDirAbs,
-		schemaPathAbs
+		schemaPathAbs,
 	);
 	const schemaReexport = `import schema from ${JSON.stringify(schemaImportPathForGeneratedSrc)};
 export type AppflareGeneratedSchema = typeof schema;
@@ -57,7 +57,7 @@ export default schema;
 	});
 	await fs.writeFile(
 		path.join(outDirAbs, "src", "schema-types.ts"),
-		schemaTypesTs
+		schemaTypesTs,
 	);
 
 	// (Re)generate built-in DB handlers based on the schema tables.
@@ -78,6 +78,8 @@ export default schema;
 			config.auth && config.auth.enabled === false
 				? undefined
 				: (config.auth?.basePath ?? "/auth"),
+		authEnabled: config.auth?.enabled !== false,
+		configPathAbs,
 	});
 	await fs.writeFile(path.join(outDirAbs, "src", "api.ts"), apiTs);
 
@@ -99,7 +101,7 @@ export default schema;
 	});
 	await fs.writeFile(
 		path.join(outDirAbs, "server", "websocket-hibernation-server.ts"),
-		websocketDoTs
+		websocketDoTs,
 	);
 
 	const schedulerTs = generateSchedulerHandlers({
@@ -110,7 +112,7 @@ export default schema;
 	});
 	await fs.writeFile(
 		path.join(outDirAbs, "server", "scheduler.ts"),
-		schedulerTs
+		schedulerTs,
 	);
 
 	const { code: cronTs } = generateCronHandlers({
@@ -144,7 +146,7 @@ async function writeEmitTsconfig(params: {
 		"./_generated";
 	const tsconfigPathAbs = path.join(
 		params.configDirAbs,
-		".appflare.tsconfig.emit.json"
+		".appflare.tsconfig.emit.json",
 	);
 	const content = {
 		compilerOptions: {

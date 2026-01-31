@@ -43,3 +43,18 @@ export const sendVerificationEmail = async (data: {
     `,
 	});
 };
+
+export const sendVerificationOtp = async (data: {
+	email: string;
+	otp: string;
+	type: "sign-in" | "email-verification" | "forget-password";
+}) => {
+	await resend().emails.send({
+		from: "noreply@anglershield.com",
+		to: data.email,
+		subject: "Verify Email",
+		html: `
+        <p>Your ${data.type} OTP is: ${data.otp}</p>
+    `,
+	});
+};

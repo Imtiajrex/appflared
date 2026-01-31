@@ -40,6 +40,12 @@ export async function loadConfig(
 		if (auth.options !== undefined && typeof auth.options !== "object") {
 			throw new Error(`Invalid config.auth.options in ${configPathAbs}`);
 		}
+		if (
+			auth.clientOptions !== undefined &&
+			typeof auth.clientOptions !== "object"
+		) {
+			throw new Error(`Invalid config.auth.clientOptions in ${configPathAbs}`);
+		}
 	}
 
 	const storage = (config as AppflareConfig).storage;

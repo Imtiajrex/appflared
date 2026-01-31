@@ -22,7 +22,7 @@ export default function SignUpPage() {
 		event.preventDefault();
 		setMessage(null);
 		setError(null);
-		const authClient = api.auth as any;
+		const authClient = api.auth;
 		if (!authClient) {
 			setError(
 				"Auth client is not configured. Enable Better Auth in appflare.config.ts.",
@@ -31,11 +31,8 @@ export default function SignUpPage() {
 		}
 		setIsLoading(true);
 		try {
-			const result = await authClient.signUp?.email({
-				email,
-				password,
-				name: name || undefined,
-			});
+			const result = await authClient.emailOtp;
+
 			setMessage(
 				result
 					? "Sign up request submitted. Check email if verification is required."

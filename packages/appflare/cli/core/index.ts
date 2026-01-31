@@ -27,6 +27,7 @@ type AppflareConfig = {
 	auth?: {
 		enabled?: boolean;
 		basePath?: string;
+		clientOptions?: Record<string, unknown>;
 	};
 };
 
@@ -37,12 +38,12 @@ program.name("appflare").description("Appflare CLI").version("0.0.0");
 program
 	.command("build")
 	.description(
-		"Generate typed schema + query/mutation client/server into outDir"
+		"Generate typed schema + query/mutation client/server into outDir",
 	)
 	.option(
 		"-c, --config <path>",
 		"Path to appflare.config.ts",
-		"appflare.config.ts"
+		"appflare.config.ts",
 	)
 	.option("--emit", "Also run tsc to emit JS + .d.ts into outDir/dist")
 	.action(async (options: { config: string; emit?: boolean }) => {
@@ -69,7 +70,7 @@ async function main(): Promise<void> {
 }
 
 async function loadConfig(
-	configPathAbs: string
+	configPathAbs: string,
 ): Promise<{ config: AppflareConfig; configDirAbs: string }> {
 	await assertFileExists(configPathAbs, `Config not found: ${configPathAbs}`);
 	const configDirAbs = path.dirname(configPathAbs);
@@ -78,7 +79,7 @@ async function loadConfig(
 	const config = (mod?.default ?? mod) as Partial<AppflareConfig>;
 	if (!config || typeof config !== "object") {
 		throw new Error(
-			`Invalid config export in ${configPathAbs} (expected default export object)`
+			`Invalid config export in ${configPathAbs} (expected default export object)`,
 		);
 	}
 	if (typeof config.dir !== "string" || !config.dir) {
@@ -107,7 +108,7 @@ async function buildFromConfig(params: {
 
 	await assertDirExists(
 		projectDirAbs,
-		`Project dir not found: ${projectDirAbs}`
+		`Project dir not found: ${projectDirAbs}`,
 	);
 	await assertFileExists(schemaPathAbs, `Schema not found: ${schemaPathAbs}`);
 
@@ -116,7 +117,7 @@ async function buildFromConfig(params: {
 
 	const schemaImportPathForGeneratedSrc = toImportPathFromGeneratedSrc(
 		outDirAbs,
-		schemaPathAbs
+		schemaPathAbs,
 	);
 	const schemaReexport = `import schema from ${JSON.stringify(schemaImportPathForGeneratedSrc)};
 export type AppflareGeneratedSchema = typeof schema;
@@ -131,7 +132,7 @@ export default schema;
 	});
 	await fs.writeFile(
 		path.join(outDirAbs, "src", "schema-types.ts"),
-		schemaTypesTs
+		schemaTypesTs,
 	);
 
 	// (Re)generate built-in DB handlers based on the schema tables.
@@ -152,6 +153,8 @@ export default schema;
 			config.auth && config.auth.enabled === false
 				? undefined
 				: (config.auth?.basePath ?? "/auth"),
+		authEnabled: config.auth?.enabled !== false,
+		configPathAbs,
 	});
 	await fs.writeFile(path.join(outDirAbs, "src", "api.ts"), apiTs);
 
@@ -173,7 +176,7 @@ export default schema;
 	});
 	await fs.writeFile(
 		path.join(outDirAbs, "server", "websocket-hibernation-server.ts"),
-		websocketDoTs
+		websocketDoTs,
 	);
 
 	const schedulerTs = generateSchedulerHandlers({
@@ -184,7 +187,7 @@ export default schema;
 	});
 	await fs.writeFile(
 		path.join(outDirAbs, "server", "scheduler.ts"),
-		schedulerTs
+		schedulerTs,
 	);
 
 	if (emit) {
