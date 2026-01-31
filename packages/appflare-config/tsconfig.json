@@ -2,7 +2,7 @@
 	"compilerOptions": {
 		"moduleResolution": "nodenext",
 		"module": "nodenext",
-		"types": ["@cloudflare/workers-types/2023-07-01"]
+		"types": ["@cloudflare/workers-types/2023-07-01", "@types/node"]
 	},
 	"include": ["./**/*"]
 }

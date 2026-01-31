@@ -41,11 +41,32 @@ export function createBetterAuthRouter<
 
 export function initBetterAuth<Options extends BetterAuthOptions>(
 	options: Options,
+	kvBinding?: string,
 ): Auth<Options> {
-	return betterAuth({
+	const authConfig: BetterAuthOptions = {
 		...options,
 		database: mongodbAdapter(getDatabase((env as any).MONGO_DB) as any),
-	});
+	};
+
+	// Add secondary storage if KV binding is provided
+	if (kvBinding && (env as any)[kvBinding]) {
+		(authConfig as any).secondaryStorage = {
+			get: async (key: string) => {
+				const kv = (env as any)[kvBinding];
+				return await kv.get(key);
+			},
+			set: async (key: string, value: string, ttl?: number) => {
+				const kv = (env as any)[kvBinding];
+				await kv.put(key, value, ttl ? { expirationTtl: ttl } : undefined);
+			},
+			delete: async (key: string) => {
+				const kv = (env as any)[kvBinding];
+				await kv.delete(key);
+			},
+		};
+	}
+
+	return betterAuth(authConfig as Options);
 }
 export const getHeaders = (headers: Headers) => {
 	const newHeaders = Object.fromEntries(headers as any);

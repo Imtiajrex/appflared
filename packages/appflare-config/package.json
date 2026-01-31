@@ -17,6 +17,7 @@
 	"dependencies": {
 		"@hono/standard-validator": "^0.2.0",
 		"better-fetch": "^1.1.2",
-		"hono": "^4.10.7"
+		"hono": "^4.10.7",
+		"resend": "^6.9.1"
 	}
 }

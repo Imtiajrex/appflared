@@ -2,11 +2,19 @@ import type { BetterAuthOptions } from "better-auth";
 import { bearer } from "better-auth/plugins";
 import type { StorageRule } from "appflare/server/storage";
 import type { AppflareConfig } from "appflare";
+import { sendEmail } from "./user";
+import { sendResetEmail, sendVerificationEmail } from "./emails";
 
 const authOptions: Partial<BetterAuthOptions> = {
 	trustedOrigins: ["http://localhost:3000"],
 	emailAndPassword: {
 		enabled: true,
+		sendResetPassword: sendResetEmail,
+	},
+	emailVerification: {
+		sendVerificationEmail: sendVerificationEmail,
+		sendOnSignIn: true,
+		sendOnSignUp: true,
 	},
 	plugins: [bearer()],
 };
