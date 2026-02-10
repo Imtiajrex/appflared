@@ -3,6 +3,7 @@
 import chokidar, { FSWatcher } from "chokidar";
 import { Command } from "commander";
 import { promises as fs } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -82,13 +83,59 @@ async function main(): Promise<void> {
 	await program.parseAsync(process.argv);
 }
 
+/**
+ * Regex that matches ES import lines pulling in React Native / Expo native
+ * modules (e.g. `import * as SecureStore from "expo-secure-store"`).
+ * These cannot be transpiled by Bun and are only needed at client runtime.
+ */
+const NATIVE_IMPORT_RE =
+	/^import\s+(?:(?:\*\s+as\s+(\w+))|(?:\{[^}]*\})|(?:(\w+)(?:\s*,\s*\{[^}]*\})?))?\s*from\s*["'](expo-[^"']+)["'];?\s*$/gm;
+
+/**
+ * Strip native-module imports from a config source and replace them with
+ * harmless stub declarations so the CLI can evaluate the config object
+ * without triggering Bun transpilation errors on native code.
+ */
+function sanitizeConfigSource(source: string): string {
+	const stubs: string[] = [];
+	const sanitized = source.replace(
+		NATIVE_IMPORT_RE,
+		(_match, starAs, defaultImport, _mod) => {
+			const name = starAs || defaultImport;
+			if (name) {
+				stubs.push(`const ${name} = {} as any;`);
+			}
+			return ""; // remove the original import line
+		},
+	);
+	return stubs.length > 0 ? stubs.join("\n") + "\n" + sanitized : sanitized;
+}
+
 async function loadConfig(
 	configPathAbs: string,
 ): Promise<{ config: AppflareConfig; configDirAbs: string }> {
 	await assertFileExists(configPathAbs, `Config not found: ${configPathAbs}`);
 	const configDirAbs = path.dirname(configPathAbs);
 
-	const mod = await import(pathToFileURL(configPathAbs).href);
+	// Read the config source and strip native-module imports (e.g. expo-secure-store)
+	// that Bun cannot transpile. Write the sanitized source to a temp file and import that.
+	const raw = await fs.readFile(configPathAbs, "utf-8");
+	const sanitized = sanitizeConfigSource(raw);
+
+	let mod: Record<string, unknown>;
+	if (sanitized !== raw) {
+		const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "appflare-cfg-"));
+		const tmpFile = path.join(tmpDir, path.basename(configPathAbs));
+		await fs.writeFile(tmpFile, sanitized);
+		try {
+			mod = await import(pathToFileURL(tmpFile).href);
+		} finally {
+			await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+		}
+	} else {
+		mod = await import(pathToFileURL(configPathAbs).href);
+	}
+
 	const config = (mod?.default ?? mod) as Partial<AppflareConfig>;
 	if (!config || typeof config !== "object") {
 		throw new Error(
