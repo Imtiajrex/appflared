@@ -219,7 +219,7 @@ export default schema;
 		configPathAbs,
 	});
 
-	const apiTs = generateApiClient({
+	const { apiTs, clientConfigTs } = generateApiClient({
 		handlers,
 		outDirAbs,
 		authBasePath:
@@ -230,6 +230,12 @@ export default schema;
 		configPathAbs,
 	});
 	await fs.writeFile(path.join(outDirAbs, "src", "api.ts"), apiTs);
+	if (clientConfigTs) {
+		await fs.writeFile(
+			path.join(outDirAbs, "src", "client.config.ts"),
+			clientConfigTs,
+		);
+	}
 
 	const serverTs = generateHonoServer({
 		handlers,
