@@ -15,6 +15,7 @@ import {
 	generateInternalTypeLines,
 } from "./types";
 import { renderObjectKey } from "./utils";
+import { extractClientConfig } from "./extract-configuration";
 
 const HEADER_TEMPLATE = `/* eslint-disable */
 /**
@@ -833,7 +834,7 @@ export function generateApiClient(params: {
 	authBasePath?: string;
 	authEnabled?: boolean;
 	configPathAbs?: string;
-}): string {
+}): { apiTs: string; clientConfigTs: string | null } {
 	const { importLines, importAliasBySource } = generateImports(params);
 	const {
 		queriesByFile,
@@ -892,15 +893,17 @@ export function generateApiClient(params: {
 				buildUrl(baseUrl, authBasePath),
 		});`;
 
-	if (params.authEnabled && params.configPathAbs) {
-		const configImportPath = toImportPathFromGeneratedSrc(
-			params.outDirAbs,
-			params.configPathAbs,
-		);
-		configImport = `\nimport __appflareConfig from ${JSON.stringify(configImportPath)};`;
+	const clientConfigTs =
+		params.authEnabled && params.configPathAbs
+			? extractClientConfig(params.configPathAbs)
+			: null;
 
-		// Use a factory function pattern to properly infer the client type from clientOptions
-		authClientTypeDefinitions = `const __getAppflareAuthClientOptions = () => (__appflareConfig.auth?.clientOptions ?? {}) as const;
+	if (params.authEnabled && params.configPathAbs) {
+		if (clientConfigTs) {
+			configImport = `\nimport { clientOptions } from "./client.config";`;
+
+			// Use a factory function pattern to properly infer the client type from clientOptions
+			authClientTypeDefinitions = `const __getAppflareAuthClientOptions = () => (clientOptions ?? {}) as const;
 type AppflareAuthClientOptions = ReturnType<typeof __getAppflareAuthClientOptions>;
 const __createTypedAuthClient = (baseURL: string) => createAuthClient({
 	...__getAppflareAuthClientOptions(),
@@ -908,37 +911,63 @@ const __createTypedAuthClient = (baseURL: string) => createAuthClient({
 });
 type AppflareAuthClient = ReturnType<typeof __createTypedAuthClient>;`;
 
-		authClientInit = `	const auth =  createAuthClient({
+			authClientInit = `	const auth =  createAuthClient({
 			...__getAppflareAuthClientOptions(),
 			...(options.auth ?? {}),
 			baseURL:
 				(options.auth as any)?.baseURL ??
 				buildUrl(baseUrl, authBasePath),
 		});`;
+		} else {
+			const configImportPath = toImportPathFromGeneratedSrc(
+				params.outDirAbs,
+				params.configPathAbs,
+			);
+			configImport = `\nimport __appflareConfig from ${JSON.stringify(configImportPath)};`;
+
+			// Use a factory function pattern to properly infer the client type from clientOptions
+			authClientTypeDefinitions = `const __getAppflareAuthClientOptions = () => (__appflareConfig.auth?.clientOptions ?? {}) as const;
+type AppflareAuthClientOptions = ReturnType<typeof __getAppflareAuthClientOptions>;
+const __createTypedAuthClient = (baseURL: string) => createAuthClient({
+	...__getAppflareAuthClientOptions(),
+	baseURL,
+});
+type AppflareAuthClient = ReturnType<typeof __createTypedAuthClient>;`;
+
+			authClientInit = `	const auth =  createAuthClient({
+			...__getAppflareAuthClientOptions(),
+			...(options.auth ?? {}),
+			baseURL:
+				(options.auth as any)?.baseURL ??
+				buildUrl(baseUrl, authBasePath),
+		});`;
+		}
 	}
 
 	const typeBlocks = generateTypeBlocks(params.handlers, importAliasBySource);
 
-	return (
-		HEADER_TEMPLATE.replace("{{configImport}}", configImport) +
-		importLines.join("\n") +
-		TYPE_DEFINITIONS_TEMPLATE +
-		typeBlocks.join("\n\n") +
-		INTERNAL_TEMPLATE.replace(
-			"{{internalQueriesTypeDef}}",
-			internalQueriesTypeDef,
-		)
-			.replace("{{internalMutationsTypeDef}}", internalMutationsTypeDef)
-			.replace("{{internalInit}}", internalInit)
-			.replace("{{internalQueriesMeta}}", internalQueriesMeta)
-			.replace("{{internalMutationsMeta}}", internalMutationsMeta) +
-		CLIENT_TYPES_TEMPLATE.replace("{{queriesTypeDef}}", queriesTypeDef)
-			.replace("{{mutationsTypeDef}}", mutationsTypeDef)
-			.replace("{{queriesInit}}", queriesInit)
-			.replace("{{mutationsInit}}", mutationsInit)
-			.replace("{{authBasePath}}", authBasePathLiteral)
-			.replace("{{authClientTypeDefinitions}}", authClientTypeDefinitions)
-			.replace("{{authClientInit}}", authClientInit) +
-		UTILITY_FUNCTIONS_TEMPLATE
-	);
+	return {
+		apiTs:
+			HEADER_TEMPLATE.replace("{{configImport}}", configImport) +
+			importLines.join("\n") +
+			TYPE_DEFINITIONS_TEMPLATE +
+			typeBlocks.join("\n\n") +
+			INTERNAL_TEMPLATE.replace(
+				"{{internalQueriesTypeDef}}",
+				internalQueriesTypeDef,
+			)
+				.replace("{{internalMutationsTypeDef}}", internalMutationsTypeDef)
+				.replace("{{internalInit}}", internalInit)
+				.replace("{{internalQueriesMeta}}", internalQueriesMeta)
+				.replace("{{internalMutationsMeta}}", internalMutationsMeta) +
+			CLIENT_TYPES_TEMPLATE.replace("{{queriesTypeDef}}", queriesTypeDef)
+				.replace("{{mutationsTypeDef}}", mutationsTypeDef)
+				.replace("{{queriesInit}}", queriesInit)
+				.replace("{{mutationsInit}}", mutationsInit)
+				.replace("{{authBasePath}}", authBasePathLiteral)
+				.replace("{{authClientTypeDefinitions}}", authClientTypeDefinitions)
+				.replace("{{authClientInit}}", authClientInit) +
+			UTILITY_FUNCTIONS_TEMPLATE,
+		clientConfigTs,
+	};
 }

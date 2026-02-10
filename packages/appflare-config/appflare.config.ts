@@ -1,7 +1,6 @@
 import type { AppflareConfig } from "appflare";
 import type { StorageRule } from "appflare/server/storage";
 import type { BetterAuthOptions } from "better-auth";
-import type { BetterAuthClientOptions } from "better-auth/client";
 import { emailOTPClient } from "better-auth/client/plugins";
 import { bearer, emailOTP } from "better-auth/plugins";
 import {
