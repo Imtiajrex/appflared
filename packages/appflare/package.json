@@ -13,6 +13,7 @@
 		"./react/*": "./react/*.ts",
 		"./react": "./react/index.ts",
 		"./server/db": "./server/db.ts",
+		"./server/d1": "./server/d1.ts",
 		"./server/storage": "./server/storage.ts",
 		"./server/auth": "./server/auth.ts"
 	},
@@ -31,6 +32,8 @@
 		"chokidar": "^5.0.0",
 		"commander": "^14.0.1",
 		"hono": "^4.6.8",
+		"kysely": "^0.28.8",
+		"kysely-d1": "^0.4.0",
 		"zod": "^4.1.13"
 	}
 }

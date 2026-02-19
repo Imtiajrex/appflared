@@ -96,6 +96,19 @@ export function generateWranglerJson(params: {
 		];
 	}
 
+	if (params.config.database) {
+		const binding = params.config.database.d1Binding ?? "DB";
+		wrangler.d1_databases = [
+			{
+				binding,
+				database_name:
+					params.config.database.d1DatabaseName ??
+					`${sanitizeWorkerName(params.configDirAbs)}-d1`,
+				database_id: params.config.database.d1DatabaseId ?? "",
+			},
+		];
+	}
+
 	if (params.cronTriggers && params.cronTriggers.length > 0) {
 		wrangler.triggers = {
 			crons: Array.from(new Set(params.cronTriggers)),

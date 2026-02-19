@@ -43,6 +43,11 @@ export default {
 	dir: "./",
 	schema: "./schema.ts",
 	outDir: "./_generated",
+	database: {
+		d1Binding: "DB",
+		d1DatabaseName: "appflare-config",
+		d1DatabaseId: "",
+	},
 	storage,
 	auth: {
 		enabled: true,
@@ -58,4 +63,4 @@ export default {
 		main: "./src/index.ts",
 		compatibilityDate: "2025-12-10",
 	},
-};
+} satisfies AppflareConfig;

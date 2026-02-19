@@ -58,6 +58,13 @@
       "id": "51ab2d7674b5490d9a34de6c14577f7e"
     }
   ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "appflare-config",
+      "database_id": ""
+    }
+  ],
   "triggers": {
     "crons": [
       "*/1 * * * *"

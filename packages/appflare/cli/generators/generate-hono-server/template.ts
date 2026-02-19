@@ -28,13 +28,14 @@ import { cors } from "hono/cors";
 import schema from ${JSON.stringify(params.schemaImportPath)};
 ${params.configImportLine}
 import {
-	createAppflareDbContext,
-	type AppflareDbContext,
+	createAppflareDbContext as createAppflareDbContextCore,
+	type AppflareDbContext as AppflareDbContextType,
 } from "appflare/server/db";
 import {
 	createR2StorageManager,
 	type StorageManagerOptions,
 } from "appflare/server/storage";${authImportBlock}
+import { createD1MigrationRouter } from "appflare/server/d1";
 import type {
 	AppflareAuthContext,
 	AppflareAuthSession,
@@ -46,7 +47,7 @@ import type {
 
 ${handlerImportBlock}
 
-export type AppflareDbContext = AppflareDbContext<TableNames, TableDocMap>;
+export type AppflareDbContext = AppflareDbContextType<TableNames, TableDocMap>;
 
 export type AppflareServerContext = AppflareAuthContext & {
 	db: AppflareDbContext;
@@ -121,10 +122,12 @@ async function runHandlerWithMiddleware<TArgs, TResult>(
 
 export function createAppflareDbContext(params: {
 	collectionName?: (table: TableNames) => string;
+	d1?: unknown;
 }): AppflareDbContext {
-	return createAppflareDbContext<TableNames, TableDocMap>({
+	return createAppflareDbContextCore<TableNames, TableDocMap>({
 		schema,
 		collectionName: params.collectionName,
+		d1: params.d1 as any,
 	});
 }
 
@@ -157,6 +160,15 @@ type StorageOptions<Env = unknown, Principal = unknown> =
 	};
 
 export type AppflareHonoServerOptions = {
+	/** D1 database binding. Defaults to env.DB when available. */
+	d1?: unknown;
+	/** Configure auto-mounted migration endpoint for D1 + Better Auth. */
+	migrations?: {
+		enabled?: boolean;
+		path?: string;
+		includeSchema?: boolean;
+		includeAuth?: boolean;
+	};
 	/** Provide a scheduler instance for enqueueing background work. */
 	scheduler?: Scheduler;
 	/** Provide a per-request scheduler instance (e.g. derived from env bindings). */
@@ -173,7 +185,7 @@ export type AppflareHonoServerOptions = {
 	corsOrigin?: string | string[];
 	realtime?: RealtimeOptions;
 	storage?: StorageOptions;
-};
+	};
 
 function normalizeTableName(table: string): TableNames {
 	const tables = schema as Record<string, unknown>;
@@ -225,8 +237,10 @@ function formatHandlerError(err: unknown): {
 
 export function createAppflareHonoServer(options: AppflareHonoServerOptions): Hono {
 	const resolveDb = async (c: HonoContext): Promise<AppflareDbContext> => {
+		const d1 = (options as any).d1 ?? (c as any)?.env?.DB;
 		return createAppflareDbContext({
 			collectionName: options.collectionName,
+			d1,
 		});
 	};
 
@@ -298,6 +312,33 @@ export function createAppflareHonoServer(options: AppflareHonoServerOptions): Ho
 
 \t\tapp.route("/", storageManager);
 \t}
+	const migrationConfig = options.migrations ?? {};
+	const migrationsEnabled = migrationConfig.enabled ?? true;
+	if (migrationsEnabled) {
+		const migrationRouter = createD1MigrationRouter({
+			path: migrationConfig.path ?? "/migrate",
+			schema:
+				migrationConfig.includeSchema === false
+					? undefined
+					: (schema as any),
+			getDb: (c) => (((options as any).d1 ?? (c as any)?.env?.DB) as any),
+			getBetterAuthOptions:
+				migrationConfig.includeAuth === false
+					? undefined
+					: async (_c, db) => {
+						const authConfig = (appflareConfig as any).auth;
+						if (
+							!authConfig ||
+							authConfig.enabled === false ||
+							!authConfig.options
+						) {
+							throw new Error("Better Auth options are not configured");
+						}
+						return { ...authConfig.options, database: db } as any;
+					},
+		});
+		app.route("/", migrationRouter);
+	}
 ${params.authSetupBlock}${params.authMountBlock}${params.authResolverBlock}\tconst resolveContext = async (
 		c: HonoContext
 	): Promise<AppflareServerContext> => {
@@ -309,7 +350,6 @@ ${params.authSetupBlock}${params.authMountBlock}${params.authResolverBlock}\tcon
 		const merged = {
 			db,
 			scheduler,
-			error,
 			...auth,
 			...(ctx ?? {}),
 			error: (ctx as any)?.error ?? error,

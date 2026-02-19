@@ -3,9 +3,11 @@ import { resolveAllowedOrigins } from "./helpers";
 export function generateCloudflareWorkerIndex(params: {
 	allowedOrigins?: string[];
 	hasCronHandlers?: boolean;
+	d1Binding?: string;
 }): string {
 	const allowedOrigins = resolveAllowedOrigins(params.allowedOrigins);
 	const allowedOriginsCsv = allowedOrigins.join(",");
+	const d1Binding = params.d1Binding ?? "DB";
 	const cronImports = params.hasCronHandlers
 		? 'import { handleCron } from "./cron";\n'
 		: "";
@@ -33,6 +35,7 @@ type DurableObjectNamespaceLike = {
 type Env = {
 	WEBSOCKET_HIBERNATION_SERVER: DurableObjectNamespaceLike;
 	APPFLARE_STORAGE?: unknown;
+	${d1Binding}?: unknown;
 	ALLOWED_ORIGINS?: string;
 	APPFLARE_SCHEDULER_QUEUE?: {
 		send: (body: unknown, options?: { delaySeconds?: number }) => Promise<void>;
@@ -66,7 +69,7 @@ export default {
 			: undefined;
 
 		const app = createAppflareHonoServer({
-			db: {} as any,
+			d1: (env as any)[${JSON.stringify(d1Binding)}],
 			corsOrigin: allowedOrigins,
 			realtime: {
 				durableObject: env.WEBSOCKET_HIBERNATION_SERVER,

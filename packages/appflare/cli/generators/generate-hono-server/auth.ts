@@ -17,7 +17,7 @@ export function buildAuthSection(config: AppflareConfig): AuthSection {
 	const hasAuth = Boolean(config.auth);
 
 	const authImports = hasAuth
-		? `import { createBetterAuthRouter, getSanitizedRequest, initBetterAuth } from "appflare/server/auth";`
+		? `import { getSanitizedRequest, initBetterAuth } from "appflare/server/auth";`
 		: "";
 
 	const authSetup = hasAuth
@@ -25,23 +25,30 @@ export function buildAuthSection(config: AppflareConfig): AuthSection {
 				`const __appflareAuthConfig = (appflareConfig as any).auth;`,
 				`const __appflareAuthBasePath = __appflareAuthConfig?.basePath ?? "/auth";`,
 				`const __appflareStorageConfig = (appflareConfig as any).storage;`,
+				`const __appflareDatabaseConfig = (appflareConfig as any).database;`,
 				`const __appflareKvBinding = __appflareStorageConfig?.kvBinding;`,
-				`const __appflareAuth =`,
-				`\t__appflareAuthConfig &&`,
-				`\t__appflareAuthConfig.enabled !== false &&`,
-				`\t__appflareAuthConfig.options`,
-				`\t\t? initBetterAuth(__appflareAuthConfig.options as any, __appflareKvBinding)`,
-				`\t\t: undefined;`,
-				`const __appflareAuthRouter = __appflareAuth`,
-				`\t? createBetterAuthRouter({`,
-				`\t\tauth: __appflareAuth,`,
-				`\t})`,
-				`\t: undefined;`,
+				`const __appflareD1Binding = __appflareDatabaseConfig?.d1Binding ?? "DB";`,
+				`const resolveAppflareAuth = (c: HonoContext) => {`,
+				`\tif (`,
+				`\t\t!__appflareAuthConfig ||`,
+				`\t\t__appflareAuthConfig.enabled === false ||`,
+				`\t\t!__appflareAuthConfig.options`,
+				`\t) {`,
+				`\t\treturn undefined;`,
+				`\t}`,
+				`\tconst envObject = (c as any)?.env as Record<string, unknown> | undefined;`,
+				`\tconst db = envObject?.[__appflareD1Binding];`,
+				`\tconst options = { ...__appflareAuthConfig.options, database: db } as any;`,
+				`\treturn initBetterAuth(options, {`,
+				`\t\tenv: envObject,`,
+				`\t\tkvBinding: __appflareKvBinding,`,
+				`\t});`,
+				`};`,
 			].join("\n")
 		: "";
 
 	const authMount = hasAuth
-		? `\n\tif (__appflareAuthRouter) {\n\t\tapp.route(__appflareAuthBasePath, __appflareAuthRouter);\n\t}\n`
+		? `\n\tapp.all(__appflareAuthBasePath + "/*", async (c) => {\n\t\tconst auth = resolveAppflareAuth(c);\n\t\tif (!auth) return c.json({ error: "Authentication disabled" }, 404);\n\t\treturn auth.handler(getSanitizedRequest(c.req.raw));\n\t});\n\tapp.all(__appflareAuthBasePath, async (c) => {\n\t\tconst auth = resolveAppflareAuth(c);\n\t\tif (!auth) return c.json({ error: "Authentication disabled" }, 404);\n\t\treturn auth.handler(getSanitizedRequest(c.req.raw));\n\t});\n`
 		: "";
 
 	const authResolver = hasAuth
@@ -49,7 +56,7 @@ export function buildAuthSection(config: AppflareConfig): AuthSection {
 				`const resolveAuthContext = async (`,
 				`\tc: HonoContext`,
 				`): Promise<AppflareAuthContext> => {`,
-				`\tif (!__appflareAuth) {`,
+				`\tconst createUnauthContext = (): AppflareAuthContext => {`,
 				`\t\tconst authContext: AppflareAuthContext = {`,
 				`\t\t\tsession: null as AppflareAuthSession,`,
 				`\t\t\tuser: null as AppflareAuthUser,`,
@@ -57,21 +64,36 @@ export function buildAuthSection(config: AppflareConfig): AuthSection {
 				`\t\tc.set("appflareSession", authContext.session);`,
 				`\t\tc.set("appflareUser", authContext.user);`,
 				`\t\treturn authContext;`,
+				`\t};`,
+				`\tlet __appflareAuth: ReturnType<typeof resolveAppflareAuth>;`,
+				`\ttry {`,
+				`\t\t__appflareAuth = resolveAppflareAuth(c);`,
+				`\t} catch (err) {`,
+				`\t\tconsole.error("Appflare auth initialization failed", err);`,
+				`\t\treturn createUnauthContext();`,
+				`\t}`,
+				`\tif (!__appflareAuth) {`,
+				`\t\treturn createUnauthContext();`,
 				`\t}`,
 				``,
-				`\tconst sessionResult = await __appflareAuth.api.getSession(`,
-				`\t\(c.req.raw)`,
-				`\t);`,
-				`\tconst authContext: AppflareAuthContext = {`,
-				`\t\tsession:`,
-				`\t\t\t(sessionResult as any)?.session ??`,
-				`\t\t\t(sessionResult as any) ??`,
-				`\t\t\t(null as AppflareAuthSession),`,
-				`\t\tuser: (sessionResult as any)?.user ?? (null as AppflareAuthUser),`,
-				`\t};`,
-				`\tc.set("appflareSession", authContext.session);`,
-				`\tc.set("appflareUser", authContext.user);`,
-				`\treturn authContext;`,
+				`\ttry {`,
+				`\t\tconst sessionResult = await __appflareAuth.api.getSession(`,
+				`\t\t(c.req.raw)`,
+				`\t\t);`,
+				`\t\tconst authContext: AppflareAuthContext = {`,
+				`\t\t\tsession:`,
+				`\t\t\t\t(sessionResult as any)?.session ??`,
+				`\t\t\t\t(sessionResult as any) ??`,
+				`\t\t\t\t(null as AppflareAuthSession),`,
+				`\t\t\tuser: (sessionResult as any)?.user ?? (null as AppflareAuthUser),`,
+				`\t\t};`,
+				`\t\tc.set("appflareSession", authContext.session);`,
+				`\t\tc.set("appflareUser", authContext.user);`,
+				`\t\treturn authContext;`,
+				`\t} catch (err) {`,
+				`\t\tconsole.error("Appflare auth session resolution failed", err);`,
+				`\t\treturn createUnauthContext();`,
+				`\t}`,
 				`};`,
 			].join("\n")
 		: [

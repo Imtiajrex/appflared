@@ -88,5 +88,34 @@ export async function loadConfig(
 			throw new Error(`Invalid config.storage.kvId in ${configPathAbs}`);
 		}
 	}
+
+	const database = (config as AppflareConfig).database;
+	if (database !== undefined) {
+		if (!database || typeof database !== "object") {
+			throw new Error(`Invalid config.database in ${configPathAbs}`);
+		}
+		if (
+			database.d1Binding !== undefined &&
+			typeof database.d1Binding !== "string"
+		) {
+			throw new Error(`Invalid config.database.d1Binding in ${configPathAbs}`);
+		}
+		if (
+			database.d1DatabaseId !== undefined &&
+			typeof database.d1DatabaseId !== "string"
+		) {
+			throw new Error(
+				`Invalid config.database.d1DatabaseId in ${configPathAbs}`,
+			);
+		}
+		if (
+			database.d1DatabaseName !== undefined &&
+			typeof database.d1DatabaseName !== "string"
+		) {
+			throw new Error(
+				`Invalid config.database.d1DatabaseName in ${configPathAbs}`,
+			);
+		}
+	}
 	return { config: config as AppflareConfig, configDirAbs };
 }

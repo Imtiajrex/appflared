@@ -1,6 +1,42 @@
 import { betterAuth, type Auth, type BetterAuthOptions } from "better-auth";
 import type { Context } from "hono";
 import { Hono } from "hono";
+import { Kysely } from "kysely";
+import { D1Dialect } from "kysely-d1";
+
+type D1DatabaseLike = {
+	prepare: (query: string) => unknown;
+	batch: (statements: unknown[]) => Promise<unknown>;
+};
+
+function isD1DatabaseLike(value: unknown): value is D1DatabaseLike {
+	if (!value || typeof value !== "object") return false;
+	const candidate = value as Record<string, unknown>;
+	return (
+		typeof candidate.prepare === "function" &&
+		typeof candidate.batch === "function"
+	);
+}
+
+function normalizeBetterAuthDatabase(
+	options: BetterAuthOptions,
+): BetterAuthOptions {
+	const normalized = { ...options } as BetterAuthOptions;
+	const database = (normalized as any).database;
+
+	if (isD1DatabaseLike(database)) {
+		(normalized as any).database = {
+			type: "sqlite",
+			db: new Kysely({
+				dialect: new D1Dialect({
+					database: database as any,
+				}),
+			}),
+		};
+	}
+
+	return normalized;
+}
 
 export type BetterAuthHandlerOptions<
 	Options extends BetterAuthOptions = BetterAuthOptions,
@@ -39,31 +75,38 @@ export function createBetterAuthRouter<
 
 export function initBetterAuth<Options extends BetterAuthOptions>(
 	options: Options,
-	kvBinding?: string,
+	bindings?: {
+		env?: Record<string, unknown>;
+		kvBinding?: string;
+	},
 ): Auth<Options> {
 	const authConfig: BetterAuthOptions = {
 		...options,
 	};
 
 	// Add secondary storage if KV binding is provided
-	if (kvBinding && (env as any)[kvBinding]) {
+	const envObject = bindings?.env as Record<string, any> | undefined;
+	const kvBinding = bindings?.kvBinding;
+	if (kvBinding && envObject?.[kvBinding]) {
 		(authConfig as any).secondaryStorage = {
 			get: async (key: string) => {
-				const kv = (env as any)[kvBinding];
+				const kv = envObject[kvBinding];
 				return await kv.get(key);
 			},
 			set: async (key: string, value: string, ttl?: number) => {
-				const kv = (env as any)[kvBinding];
+				const kv = envObject[kvBinding];
 				await kv.put(key, value, ttl ? { expirationTtl: ttl } : undefined);
 			},
 			delete: async (key: string) => {
-				const kv = (env as any)[kvBinding];
+				const kv = envObject[kvBinding];
 				await kv.delete(key);
 			},
 		};
 	}
 
-	return betterAuth(authConfig as Options);
+	const normalizedAuthConfig = normalizeBetterAuthDatabase(authConfig);
+
+	return betterAuth(normalizedAuthConfig as Options);
 }
 export const getHeaders = (headers: Headers) => {
 	const newHeaders = Object.fromEntries(headers as any);

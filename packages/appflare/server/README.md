@@ -21,6 +21,22 @@ Use `createR2StorageManager` to mount authenticated, rule-driven storage routes 
 
 Use `initBetterAuth` with `createBetterAuthRouter` to forward requests to a Better Auth instance from a Hono server.
 
+## D1 (Cloudflare Workers)
+
+Use the D1 helpers from `appflare/server/d1`:
+
+- `createD1DbHandler(db)`: lightweight prepared-statement wrapper.
+- `buildD1SchemaMigrations({ schema })`: generates `CREATE TABLE` SQL from Appflare schema.
+- `runD1SchemaMigrations({ db, schema })`: applies schema migrations safely (with deferred foreign keys).
+- `runBetterAuthD1Migrations({ authOptions })`: executes Better Auth migrations using `getMigrations`.
+- `createD1MigrationRouter(...)`: creates a `/migrate` endpoint for manual/boot migrations.
+
+Minimal example:
+
+- Build Better Auth options at runtime with `database: env.DB`.
+- Call `runBetterAuthD1Migrations`.
+- Call `runD1SchemaMigrations` with your Appflare schema.
+
 ## API Reference
 
 ### Context Factory

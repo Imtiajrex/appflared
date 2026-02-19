@@ -57,6 +57,14 @@ export type AppflareConfig<
 		[key: string]: unknown;
 	};
 	auth?: AppflareAuthConfig<Options, ClientOptions>;
+	database?: {
+		/** Cloudflare D1 binding name exposed to the worker environment. */
+		d1Binding?: string;
+		/** Optional D1 database id for wrangler.json generation. */
+		d1DatabaseId?: string;
+		/** Optional D1 database name for wrangler.json generation. */
+		d1DatabaseName?: string;
+	};
 	storage?: AppflareStorageConfig;
 	scheduler?: AppflareSchedulerConfig;
 };

@@ -288,6 +288,7 @@ export default schema;
 	const workerIndexTs = generateCloudflareWorkerIndex({
 		allowedOrigins,
 		hasCronHandlers: cronHandlersPresent,
+		d1Binding: config.database?.d1Binding ?? "DB",
 	});
 	await fs.writeFile(path.join(outDirAbs, "server", "index.ts"), workerIndexTs);
 
