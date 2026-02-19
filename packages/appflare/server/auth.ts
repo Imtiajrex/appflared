@@ -25,9 +25,7 @@ export function createBetterAuthHandler<
 	};
 }
 
-import { mongodbAdapter } from "better-auth/adapters/mongodb";
-import { getDatabase } from "cloudflare-do-mongo";
-import { env } from "cloudflare:workers";
+// Basic auth handler
 export function createBetterAuthRouter<
 	Options extends BetterAuthOptions = BetterAuthOptions,
 	Env = unknown,
@@ -45,7 +43,6 @@ export function initBetterAuth<Options extends BetterAuthOptions>(
 ): Auth<Options> {
 	const authConfig: BetterAuthOptions = {
 		...options,
-		database: mongodbAdapter(getDatabase((env as any).MONGO_DB) as any),
 	};
 
 	// Add secondary storage if KV binding is provided

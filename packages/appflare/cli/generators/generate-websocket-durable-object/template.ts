@@ -17,7 +17,7 @@ export type WebsocketDoTemplateParams = {
 };
 
 export function renderWebsocketDurableObjectTemplate(
-	params: WebsocketDoTemplateParams
+	params: WebsocketDoTemplateParams,
 ): string {
 	const authImportBlock = params.authImportLine
 		? `${params.authImportLine}\n`
@@ -52,7 +52,7 @@ import type {
 \tAppflareAuthSession,
 \tAppflareAuthUser,
 } from ${JSON.stringify(schemaTypesImportPath)};
-import { MongoClient } from "mongodb";
+
 ${importsBlock}const emptyAuthContext: AppflareAuthContext = {
 \tsession: null as AppflareAuthSession,
 \tuser: null as AppflareAuthUser,
@@ -148,14 +148,12 @@ const defaultHandlerForTable = (
 			const file = matchKey.slice(0, matchKey.length - suffix.length);
 			return { file, name: handlerName };
 		}
-\t}
-\treturn null;
+	}
+	return null;
 };
 
-const resolveDatabase = (env: any) => {
-\tconst client = new MongoClient(env.MONGO_URI);
-\tconst db = client.db(env.MONGO_DB);
-\treturn db;
+const resolveDatabase = (_env: any): Record<string, unknown> => {
+	return {};
 };
 
 type AppflareHandlerError = Error & {

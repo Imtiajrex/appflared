@@ -47,7 +47,7 @@ The build orchestrator in [packages/appflare/cli/core/build.ts](packages/appflar
    - Realtime helpers build websocket URLs for subscriptions, normalizing `ws`/`wss` bases and providing hooks (`onOpen`, `onMessage`, `onData`, etc.).
 7. Generate a Hono server at `outDir/server/server.ts` with [packages/appflare/cli/generators/generate-hono-server.ts](packages/appflare/cli/generators/generate-hono-server.ts):
    - Routes: `GET /queries/<file>/<name>` and `POST /mutations/<file>/<name>`.
-   - Uses `@hono/standard-validator` + Zod arg schemas and wraps Mongo via `createMongoDbContext` from `appflare/server/db`.
+   - Uses `@hono/standard-validator` + Zod arg schemas and wraps the database context via `createAppflareDbContext` from `appflare/server/db`.
    - Supports optional mutation notifications for realtime (custom notifier or Durable Object hook).
 8. Generate a websocket Durable Object shim at `outDir/server/websocket-hibernation-server.ts` via [packages/appflare/cli/generators/generate-websocket-durable-object.ts](packages/appflare/cli/generators/generate-websocket-durable-object.ts):
    - Implements `WebSocketHibernationServer` to handle subscriptions at `/ws` and mutation notifications at `/notify`.
@@ -71,7 +71,7 @@ src/
     index.ts
   api.ts                  # Typed queries/mutations client with realtime helpers
 server/
-  server.ts               # Hono server that wires handlers + Mongo context
+  server.ts               # Hono server that wires handlers + database context
   websocket-hibernation-server.ts # Durable Object websocket bridge
 ```
 
@@ -105,4 +105,4 @@ import { createAppflareApi } from "./_generated/src/api";
 import server from "./_generated/server/server";
 ```
 
-Use the client in web/React or server contexts, and deploy the generated Hono server + Durable Object to your runtime of choice (e.g., Cloudflare Workers with Mongo).
+Use the client in web/React or server contexts, and deploy the generated Hono server + Durable Object to your runtime of choice (e.g., Cloudflare Workers).

@@ -22,11 +22,8 @@ export function generateCloudflareWorkerIndex(params: {
 import { createAppflareHonoServer } from "./server";
 import { WebSocketHibernationServer } from "./websocket-hibernation-server";
 import { createScheduler, handleSchedulerBatch } from "./scheduler";
-${cronImports}import { getDatabase } from "cloudflare-do-mongo";
-import { MONGO_DURABLE_OBJECT } from "cloudflare-do-mongo/do";
-import type { Hono } from "hono";
+${cronImports}import type { Hono } from "hono";
 import { cors } from "hono/cors";
-import { Db } from "mongodb";
 
 type DurableObjectNamespaceLike = {
 	idFromName(name: string): any;
@@ -34,10 +31,7 @@ type DurableObjectNamespaceLike = {
 };
 
 type Env = {
-	MONGO_DB: unknown;
-	MONGO_URI?: string;
 	WEBSOCKET_HIBERNATION_SERVER: DurableObjectNamespaceLike;
-	MONGO_DURABLE_OBJECT: DurableObjectNamespaceLike;
 	APPFLARE_STORAGE?: unknown;
 	ALLOWED_ORIGINS?: string;
 	APPFLARE_SCHEDULER_QUEUE?: {
@@ -72,7 +66,7 @@ export default {
 			: undefined;
 
 		const app = createAppflareHonoServer({
-			db: getDatabase(env.MONGO_DB) as unknown as Db,
+			db: {} as any,
 			corsOrigin: allowedOrigins,
 			realtime: {
 				durableObject: env.WEBSOCKET_HIBERNATION_SERVER,
@@ -143,6 +137,6 @@ ${scheduledBlock}
 	},
 } satisfies ExportedHandler<Env>;
 
-export { MONGO_DURABLE_OBJECT, WebSocketHibernationServer };
+export { WebSocketHibernationServer };
 `;
 }

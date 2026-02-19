@@ -17,7 +17,7 @@ export function generateSchedulerHandlers(params: {
 	configPathAbs: string;
 }): string {
 	const schedulerHandlers = params.handlers.filter(
-		(handler) => handler.kind === "scheduler"
+		(handler) => handler.kind === "scheduler",
 	);
 
 	const imports = buildImportSection({
@@ -37,7 +37,7 @@ export function generateSchedulerHandlers(params: {
 		localNameFor: imports.localNameFor,
 	});
 
-	const importsBlock = `import { createAppflareDbContext, type AppflareDbContext } from ${JSON.stringify(serverImportPath)};\nimport type {\n\tScheduler,\n\tSchedulerEnqueueOptions,\n\tAppflareAuthContext,\n\tAppflareAuthSession,\n\tAppflareAuthUser,\n} from ${JSON.stringify(schemaTypesImportPath)};\nimport { getDatabase } from "cloudflare-do-mongo";\nimport { Db } from "mongodb";\n${handlerImportBlock}`;
+	const importsBlock = `import { createAppflareDbContext, type AppflareDbContext } from ${JSON.stringify(serverImportPath)};\nimport type {\n\tScheduler,\n\tSchedulerEnqueueOptions,\n\tAppflareAuthContext,\n\tAppflareAuthSession,\n\tAppflareAuthUser,\n} from ${JSON.stringify(schemaTypesImportPath)};\n${handlerImportBlock}`;
 
 	return [
 		filePreamble,

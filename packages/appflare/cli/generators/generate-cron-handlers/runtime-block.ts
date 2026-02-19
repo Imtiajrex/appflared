@@ -12,7 +12,7 @@ export const buildRuntimeBlock = (): string => `
  }): Promise<void> {
  	const { controller, env, ctx } = params;
  	const db = createAppflareDbContext({
- 		db: getDatabase(env.MONGO_DB) as unknown as Db,
+ 		db: {} as any,
  	});
  
  	const scheduler = env.APPFLARE_SCHEDULER_QUEUE

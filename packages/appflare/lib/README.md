@@ -27,7 +27,7 @@ Docs for the shared library helpers in `lib/`
 **Location helpers** ([packages/appflare/lib/location.ts](packages/appflare/lib/location.ts))
 
 - Builders: `point(lng, lat)` returns a GeoJSON Point; `geo.point` is the same alias.
-- Queries: `geo.near("location", pointLngLat, { maxDistanceMeters })`, `geo.withinRadius("location", center, radiusMeters)`, `geo.withinBox(...)`, `geo.withinPolygon(...)`, `geo.intersects(...)` produce Mongo-ready filters you can pass to `where`.
+- Queries: `geo.near("location", pointLngLat, { maxDistanceMeters })`, `geo.withinRadius("location", center, radiusMeters)`, `geo.withinBox(...)`, `geo.withinPolygon(...)`, `geo.intersects(...)` produce query filters you can pass to `where`.
 
 **Example: define a schema**
 

@@ -8,7 +8,6 @@ export const buildTypeHelpersBlock = (): string => `
  type CronTriggerValue = string | readonly string[] | undefined;
  
  type Env = {
- 	MONGO_DB: unknown;
  	APPFLARE_SCHEDULER_QUEUE?: {
  		send: (body: unknown, options?: { delaySeconds?: number }) => Promise<void>;
  	};

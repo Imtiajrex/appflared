@@ -28,25 +28,25 @@ import { cors } from "hono/cors";
 import schema from ${JSON.stringify(params.schemaImportPath)};
 ${params.configImportLine}
 import {
-\tcreateMongoDbContext,
-\ttype MongoDbContext,
+	createAppflareDbContext,
+	type AppflareDbContext,
 } from "appflare/server/db";
 import {
-\tcreateR2StorageManager,
-\ttype StorageManagerOptions,
+	createR2StorageManager,
+	type StorageManagerOptions,
 } from "appflare/server/storage";${authImportBlock}
 import type {
-\tAppflareAuthContext,
-\tAppflareAuthSession,
-\tAppflareAuthUser,
-\tTableDocMap,
-\tTableNames,
-\tScheduler,
+	AppflareAuthContext,
+	AppflareAuthSession,
+	AppflareAuthUser,
+	TableDocMap,
+	TableNames,
+	Scheduler,
 } from "../src/schema-types";
 
 ${handlerImportBlock}
 
-export type AppflareDbContext = MongoDbContext<TableNames, TableDocMap>;
+export type AppflareDbContext = AppflareDbContext<TableNames, TableDocMap>;
 
 export type AppflareServerContext = AppflareAuthContext & {
 	db: AppflareDbContext;
@@ -120,54 +120,48 @@ async function runHandlerWithMiddleware<TArgs, TResult>(
 }
 
 export function createAppflareDbContext(params: {
-\tdb: import("mongodb").Db;
-\tcollectionName?: (table: TableNames) => string;
+	collectionName?: (table: TableNames) => string;
 }): AppflareDbContext {
-\treturn createMongoDbContext<TableNames, TableDocMap>({
-\t\tdb: params.db,
-\t\tschema,
-\t\tcollectionName: params.collectionName,
-\t});
+	return createAppflareDbContext<TableNames, TableDocMap>({
+		schema,
+		collectionName: params.collectionName,
+	});
 }
 
 export type MutationNotification = {
-\ttable: TableNames;
-\thandler: { file: string; name: string };
-\targs: unknown;
-\tresult: unknown;
+	table: TableNames;
+	handler: { file: string; name: string };
+	args: unknown;
+	result: unknown;
 };
 
 type DurableObjectNamespaceLike = {
-\tidFromName(name: string): any;
-\tget(id: any): { fetch(input: any, init?: RequestInit): Promise<Response> };
+	idFromName(name: string): any;
+	get(id: any): { fetch(input: any, init?: RequestInit): Promise<Response> };
 };
 
 type MutationNotifier = (payload: MutationNotification) => Promise<void>;
 
 type RealtimeOptions = {
-\tnotify?: MutationNotifier;
-\tdurableObject?: DurableObjectNamespaceLike;
-\tdurableObjectName?: string;
+	notify?: MutationNotifier;
+	durableObject?: DurableObjectNamespaceLike;
+	durableObjectName?: string;
 };
 
 type StorageOptions<Env = unknown, Principal = unknown> =
-\tPartial<StorageManagerOptions<Env, Principal>> & {
-\t\tenabled?: boolean;
-\t\tcorsOrigin?: string | string[];
-\t\tcorsAllowHeaders?: string[];
-\t\tcorsAllowMethods?: string[];
-\t};
+	Partial<StorageManagerOptions<Env, Principal>> & {
+		enabled?: boolean;
+		corsOrigin?: string | string[];
+		corsAllowHeaders?: string[];
+		corsAllowMethods?: string[];
+	};
 
 export type AppflareHonoServerOptions = {
-\t/** Provide a static Mongo Db instance. If omitted, set getDb instead. */
-\tdb?: import("mongodb").Db;
-\t/** Provide a per-request Mongo Db instance (e.g. from Cloudflare env bindings). */
-\tgetDb?: (c: HonoContext) => import("mongodb").Db | Promise<import("mongodb").Db>;
 	/** Provide a scheduler instance for enqueueing background work. */
 	scheduler?: Scheduler;
 	/** Provide a per-request scheduler instance (e.g. derived from env bindings). */
 	getScheduler?: (c: HonoContext) => Scheduler | Promise<Scheduler>;
-\t/** Optionally extend the context beyond the db wrapper. */
+	/** Optionally extend the context beyond the db wrapper. */
 	createContext?: (
 		c: HonoContext,
 		db: AppflareDbContext,
@@ -175,79 +169,63 @@ export type AppflareHonoServerOptions = {
 		scheduler?: Scheduler,
 		error?: AppflareErrorFactory
 	) => AppflareServerContext | Promise<AppflareServerContext>;
-\tcollectionName?: (table: TableNames) => string;
-\tcorsOrigin?: string | string[];
-\trealtime?: RealtimeOptions;
-\tstorage?: StorageOptions;
+	collectionName?: (table: TableNames) => string;
+	corsOrigin?: string | string[];
+	realtime?: RealtimeOptions;
+	storage?: StorageOptions;
 };
 
 function normalizeTableName(table: string): TableNames {
-\tconst tables = schema as Record<string, unknown>;
-\tif (tables[table]) return table as TableNames;
-\tconst plural = table + "s";
-\tif (tables[plural]) return plural as TableNames;
-\tthrow new Error("Unknown table: " + table);
+	const tables = schema as Record<string, unknown>;
+	if (tables[table]) return table as TableNames;
+	const plural = table + "s";
+	if (tables[plural]) return plural as TableNames;
+	throw new Error("Unknown table: " + table);
 }
 
 function normalizeStorageBasePath(basePath?: string): string {
-\tif (!basePath) return "/storage";
-\tconst withLeadingSlash = basePath.startsWith("/")
-\t\t? basePath
-\t\t: "/" + basePath;
-\treturn withLeadingSlash.endsWith("/")
-\t\t? withLeadingSlash.slice(0, -1) || "/"
-\t\t: withLeadingSlash;
+	if (!basePath) return "/storage";
+	const withLeadingSlash = basePath.startsWith("/")
+		? basePath
+		: "/" + basePath;
+	return withLeadingSlash.endsWith("/")
+		? withLeadingSlash.slice(0, -1) || "/"
+		: withLeadingSlash;
 }
 
 function formatHandlerError(err: unknown): {
-\tstatus: number;
-\tbody: { error: string; details?: unknown };
+	status: number;
+	body: { error: string; details?: unknown };
 } {
 	if (isHandlerError(err)) {
 		return { status: err.status, body: handlerErrorBody(err) };
 	}
-\tconst statusCandidate =
-\t\ttypeof err === "object" && err !== null
-\t\t\t? Number((err as any).status ?? (err as any).statusCode)
-\t\t\t: undefined;
-\tconst status = Number.isFinite(statusCandidate)
-\t\t? Number(statusCandidate)
-\t\t: 500;
+	const statusCandidate =
+		typeof err === "object" && err !== null
+			? Number((err as any).status ?? (err as any).statusCode)
+			: undefined;
+	const status = Number.isFinite(statusCandidate)
+		? Number(statusCandidate)
+		: 500;
 
-\tconst message =
-\t\terr instanceof Error
-\t\t\t? err.message
-\t\t\t: typeof err === "string"
-\t\t\t\t? err
-\t\t\t\t: "Unknown error";
-\tconst includeDetails =
-\t\terr && typeof err === "object" && !(err instanceof Error) && !Array.isArray(err);
+	const message =
+		err instanceof Error
+			? err.message
+			: typeof err === "string"
+				? err
+				: "Unknown error";
+	const includeDetails =
+		err && typeof err === "object" && !(err instanceof Error) && !Array.isArray(err);
 
-\treturn {
-\t\tstatus,
-\t\tbody: includeDetails ? { error: message, details: err } : { error: message },
-\t};
+	return {
+		status,
+		body: includeDetails ? { error: message, details: err } : { error: message },
+	};
 }
 
 export function createAppflareHonoServer(options: AppflareHonoServerOptions): Hono {
-\tconst fixedDb =
-\t\toptions.db &&
-\t\tcreateAppflareDbContext({
-\t\t\tdb: options.db,
-\t\t\tcollectionName: options.collectionName,
-\t\t});
-
-\tif (!fixedDb && !options.getDb) {
-\t\tthrow new Error(
-\t\t	"AppflareHonoServer requires either options.db or options.getDb to initialize the database context."
-\t\t);
-\t}
-
 	const resolveDb = async (c: HonoContext): Promise<AppflareDbContext> => {
-		if (fixedDb) return fixedDb;
-		const db = await options.getDb!(c);
 		return createAppflareDbContext({
-			db,
 			collectionName: options.collectionName,
 		});
 	};

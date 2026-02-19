@@ -25,7 +25,7 @@ export async function handleSchedulerBatch(params: {
 	}
 
 	const db = createAppflareDbContext({
-		db: getDatabase(env.MONGO_DB) as unknown as Db,
+		db: {} as any,
 	});
 	const scheduler = createScheduler(env.APPFLARE_SCHEDULER_QUEUE);
 	const baseContext: SchedulerHandlerContext = {

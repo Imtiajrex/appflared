@@ -50,7 +50,6 @@ export function generateWranglerJson(params: {
 		],
 		migrations: [
 			{ new_sqlite_classes: ["WebSocketHibernationServer"], tag: "v1" },
-			{ new_sqlite_classes: ["MONGO_DURABLE_OBJECT"], tag: "v2" },
 		],
 		durable_objects: {
 			bindings: [
@@ -58,7 +57,6 @@ export function generateWranglerJson(params: {
 					class_name: "WebSocketHibernationServer",
 					name: "WEBSOCKET_HIBERNATION_SERVER",
 				},
-				{ class_name: "MONGO_DURABLE_OBJECT", name: "MONGO_DURABLE_OBJECT" },
 			],
 		},
 		observability: { enabled: true },

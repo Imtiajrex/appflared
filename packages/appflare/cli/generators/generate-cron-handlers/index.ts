@@ -17,7 +17,7 @@ export function generateCronHandlers(params: {
 	configPathAbs: string;
 }): { code: string; cronTriggers: string[] } {
 	const cronHandlers = params.handlers.filter(
-		(handler) => handler.kind === "cron"
+		(handler) => handler.kind === "cron",
 	);
 
 	const imports = buildImportSection({
@@ -37,7 +37,7 @@ export function generateCronHandlers(params: {
 		localNameFor: imports.localNameFor,
 	});
 
-	const importsBlock = `import { createAppflareDbContext, type AppflareDbContext } from ${JSON.stringify(serverImportPath)};\nimport type {\n\tScheduler,\n\tSchedulerEnqueueOptions,\n\tSchedulerPayload,\n\tSchedulerTaskName,\n\tAppflareAuthContext,\n\tAppflareAuthSession,\n\tAppflareAuthUser,\n} from ${JSON.stringify(schemaTypesImportPath)};\nimport { createScheduler } from "./scheduler";\nimport { getDatabase } from "cloudflare-do-mongo";\nimport { Db } from "mongodb";\n${handlerImportBlock}`;
+	const importsBlock = `import { createAppflareDbContext, type AppflareDbContext } from ${JSON.stringify(serverImportPath)};\nimport type {\n\tScheduler,\n\tSchedulerEnqueueOptions,\n\tSchedulerPayload,\n\tSchedulerTaskName,\n\tAppflareAuthContext,\n\tAppflareAuthSession,\n\tAppflareAuthUser,\n} from ${JSON.stringify(schemaTypesImportPath)};\nimport { createScheduler } from "./scheduler";\n${handlerImportBlock}`;
 
 	const code = [
 		filePreamble,
@@ -53,8 +53,8 @@ export function generateCronHandlers(params: {
 		new Set(
 			cronHandlers
 				.flatMap((handler) => handler.cronTriggers ?? [])
-				.filter((value): value is string => Boolean(value))
-		)
+				.filter((value): value is string => Boolean(value)),
+		),
 	);
 
 	return { code, cronTriggers };

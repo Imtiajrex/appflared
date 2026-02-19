@@ -1,5 +1,3 @@
-import type { Db } from "mongodb";
-
 export type AnyZod = any;
 
 export type TableDocBase = {
@@ -154,36 +152,21 @@ type QueryWhereField<T> =
 	| NonNil<T>
 	| {
 			eq?: NonNil<T>;
-			$eq?: NonNil<T>;
 			ne?: NonNil<T>;
-			$ne?: NonNil<T>;
 			in?: ArrayOperand<T>;
-			$in?: ArrayOperand<T>;
 			nin?: ArrayOperand<T>;
-			$nin?: ArrayOperand<T>;
 			gt?: Comparable<T>;
-			$gt?: Comparable<T>;
 			gte?: Comparable<T>;
-			$gte?: Comparable<T>;
 			lt?: Comparable<T>;
-			$lt?: Comparable<T>;
 			lte?: Comparable<T>;
-			$lte?: Comparable<T>;
 			exists?: boolean;
-			$exists?: boolean;
 			regex?: RegexOperand<T>;
-			$regex?: RegexOperand<T>;
-			$options?: string;
 	  };
 
 type LogicalWhere<TDoc extends Record<string, unknown>> = {
-	$and?: ReadonlyArray<QueryWhere<TDoc>>;
 	and?: ReadonlyArray<QueryWhere<TDoc>>;
-	$or?: ReadonlyArray<QueryWhere<TDoc>>;
 	or?: ReadonlyArray<QueryWhere<TDoc>>;
-	$nor?: ReadonlyArray<QueryWhere<TDoc>>;
 	nor?: ReadonlyArray<QueryWhere<TDoc>>;
-	$not?: QueryWhere<TDoc>;
 	not?: QueryWhere<TDoc>;
 };
 
@@ -251,130 +234,6 @@ export type WithPopulatedMany<
 };
 
 export type WithSelected<TDoc, TKeys extends Keys<TDoc>> = Pick<TDoc, TKeys>;
-
-export type MongoDbQuery<
-	TableName extends string,
-	TTableDocMap extends Record<string, TableDocBase>,
-	TResultDoc,
-> = {
-	where(
-		filter: QueryWhere<TTableDocMap[TableName]>
-	): MongoDbQuery<TableName, TTableDocMap, TResultDoc>;
-	sort(
-		sort: QuerySort<keyof TTableDocMap[TableName] & string>
-	): MongoDbQuery<TableName, TTableDocMap, TResultDoc>;
-	limit(limit: number): MongoDbQuery<TableName, TTableDocMap, TResultDoc>;
-	offset(offset: number): MongoDbQuery<TableName, TTableDocMap, TResultDoc>;
-
-	select<const TKeys extends readonly Keys<TResultDoc>[]>(
-		keys: TKeys
-	): MongoDbQuery<
-		TableName,
-		TTableDocMap,
-		WithSelected<TResultDoc, TKeys[number]>
-	>;
-	select<const TKeys extends readonly Keys<TResultDoc>[]>(
-		...keys: TKeys
-	): MongoDbQuery<
-		TableName,
-		TTableDocMap,
-		WithSelected<TResultDoc, TKeys[number]>
-	>;
-
-	populate<const TKey extends PopulatableKeys<TResultDoc, TTableDocMap>>(
-		key: TKey
-	): MongoDbQuery<
-		TableName,
-		TTableDocMap,
-		WithPopulated<TResultDoc, TKey, TTableDocMap>
-	>;
-	populate<
-		const TKeys extends readonly PopulatableKeys<TResultDoc, TTableDocMap>[],
-	>(
-		keys: TKeys
-	): MongoDbQuery<
-		TableName,
-		TTableDocMap,
-		WithPopulatedMany<TResultDoc, TKeys[number], TTableDocMap>
-	>;
-	populate<TInclude extends AppflareInclude<TResultDoc, TTableDocMap>>(
-		include: TInclude
-	): MongoDbQuery<
-		TableName,
-		TTableDocMap,
-		WithPopulatedMany<
-			TResultDoc,
-			IncludedKeys<TResultDoc, TInclude, TTableDocMap>,
-			TTableDocMap
-		> &
-			WithAggregatesForInclude<TResultDoc, TTableDocMap, TInclude>
-	>;
-
-	find(): Promise<Array<TResultDoc>>;
-	findOne(): Promise<TResultDoc | null>;
-};
-
-export type MongoDbDeleteBuilder<
-	TableName extends string,
-	TTableDocMap extends Record<string, TableDocBase>,
-> = {
-	where(where: Id<TableName> | QueryWhere<TTableDocMap[TableName]>): {
-		exec(): Promise<void>;
-	};
-};
-
-export type MongoDbUpdateBuilder<
-	TableName extends string,
-	TTableDocMap extends Record<string, TableDocBase>,
-> = {
-	where(where: Id<TableName> | QueryWhere<TTableDocMap[TableName]>): {
-		set(partial: Partial<EditableDoc<TTableDocMap[TableName]>>): {
-			exec(): Promise<void>;
-		};
-		exec(partial: Partial<EditableDoc<TTableDocMap[TableName]>>): Promise<void>;
-	};
-};
-
-export type MongoDbPatchBuilder<
-	TableName extends string,
-	TTableDocMap extends Record<string, TableDocBase>,
-> = MongoDbUpdateBuilder<TableName, TTableDocMap>;
-
-export type MongoDbCoreContext<
-	TTableNames extends string,
-	TTableDocMap extends Record<TTableNames, TableDocBase>,
-> = {
-	query<TableName extends TTableNames>(
-		table: TableName
-	): MongoDbQuery<TableName, TTableDocMap, TTableDocMap[TableName]>;
-	insert<TableName extends TTableNames>(
-		table: TableName,
-		value: EditableDoc<TTableDocMap[TableName]>
-	): Promise<Id<TableName>>;
-	update<TableName extends TTableNames>(
-		table: TableName
-	): MongoDbUpdateBuilder<TableName, TTableDocMap>;
-	update<TableName extends TTableNames>(
-		table: TableName,
-		where: Id<TableName> | QueryWhere<TTableDocMap[TableName]>,
-		partial: Partial<EditableDoc<TTableDocMap[TableName]>>
-	): Promise<void>;
-	patch<TableName extends TTableNames>(
-		table: TableName
-	): MongoDbPatchBuilder<TableName, TTableDocMap>;
-	patch<TableName extends TTableNames>(
-		table: TableName,
-		where: Id<TableName> | QueryWhere<TTableDocMap[TableName]>,
-		partial: Partial<EditableDoc<TTableDocMap[TableName]>>
-	): Promise<void>;
-	delete<TableName extends TTableNames>(
-		table: TableName
-	): MongoDbDeleteBuilder<TableName, TTableDocMap>;
-	delete<TableName extends TTableNames>(
-		table: TableName,
-		where: Id<TableName> | QueryWhere<TTableDocMap[TableName]>
-	): Promise<void>;
-};
 
 export type AppflareFindManyArgs<
 	TableName extends string,
@@ -453,17 +312,18 @@ export type AppflareCountArgs<
 	where?: QueryWhere<TTableDocMap[TableName]>;
 };
 
-type AggregateGroupInput<TDoc> =
+export type AggregateGroupInput<TDoc> =
 	| ReadonlyArray<keyof TDoc & string>
 	| (keyof TDoc & string);
 
-type NormalizeGroupInput<TDoc, TGroup> = TGroup extends readonly (infer K)[]
-	? ReadonlyArray<Extract<K, keyof TDoc & string>>
-	: TGroup extends string
-		? ReadonlyArray<Extract<TGroup, keyof TDoc & string>>
-		: ReadonlyArray<never>;
+export type NormalizeGroupInput<TDoc, TGroup> =
+	TGroup extends readonly (infer K)[]
+		? ReadonlyArray<Extract<K, keyof TDoc & string>>
+		: TGroup extends string
+			? ReadonlyArray<Extract<TGroup, keyof TDoc & string>>
+			: ReadonlyArray<never>;
 
-type AggregateId<
+export type AggregateId<
 	TDoc,
 	TGroup extends ReadonlyArray<keyof TDoc & string>,
 > = TGroup extends readonly []
@@ -472,7 +332,7 @@ type AggregateId<
 		? TDoc[Extract<K, keyof TDoc>]
 		: { [K in TGroup[number]]: TDoc[K] };
 
-type AggregateResult<
+export type AggregateResult<
 	TDoc,
 	TGroup extends ReadonlyArray<keyof TDoc & string>,
 	TSum extends ReadonlyArray<NumericKeys<TDoc>>,
@@ -499,135 +359,7 @@ export type AppflareAggregateArgs<
 	groupBy?: TGroup;
 	sum?: TSum;
 	avg?: TAvg;
-	/**
-	 * Populate aggregated group keys that are references to other tables.
-	 * Only keys present in groupBy are eligible for populate.
-	 */
 	populate?: AppflareInclude<TTableDocMap[TableName], TTableDocMap>;
-};
-
-export type AppflareTableClient<
-	TableName extends string,
-	TTableDocMap extends Record<TableName, TableDocBase>,
-> = {
-	findMany<TSelect = AppflareSelect<TTableDocMap[TableName]>, TInclude = never>(
-		args?: AppflareFindManyArgs<TableName, TTableDocMap> & {
-			select?: TSelect;
-			include?: TInclude;
-		}
-	): Promise<
-		Array<
-			AppflareResultDoc<
-				TTableDocMap[TableName],
-				TSelect,
-				TInclude,
-				TTableDocMap
-			>
-		>
-	>;
-	findFirst<
-		TSelect = AppflareSelect<TTableDocMap[TableName]>,
-		TInclude = never,
-	>(
-		args?: AppflareFindFirstArgs<TableName, TTableDocMap> & {
-			select?: TSelect;
-			include?: TInclude;
-		}
-	): Promise<AppflareResultDoc<
-		TTableDocMap[TableName],
-		TSelect,
-		TInclude,
-		TTableDocMap
-	> | null>;
-	findUnique<
-		TSelect = AppflareSelect<TTableDocMap[TableName]>,
-		TInclude = never,
-	>(
-		args: AppflareFindUniqueArgs<TableName, TTableDocMap> & {
-			select?: TSelect;
-			include?: TInclude;
-		}
-	): Promise<AppflareResultDoc<
-		TTableDocMap[TableName],
-		TSelect,
-		TInclude,
-		TTableDocMap
-	> | null>;
-	create<TSelect = AppflareSelect<TTableDocMap[TableName]>, TInclude = never>(
-		args: AppflareCreateArgs<TableName, TTableDocMap> & {
-			select?: TSelect;
-			include?: TInclude;
-		}
-	): Promise<
-		AppflareResultDoc<TTableDocMap[TableName], TSelect, TInclude, TTableDocMap>
-	>;
-	update<TSelect = AppflareSelect<TTableDocMap[TableName]>, TInclude = never>(
-		args: AppflareUpdateArgs<TableName, TTableDocMap> & {
-			select?: TSelect;
-			include?: TInclude;
-		}
-	): Promise<AppflareResultDoc<
-		TTableDocMap[TableName],
-		TSelect,
-		TInclude,
-		TTableDocMap
-	> | null>;
-	updateMany(
-		args: AppflareUpdateManyArgs<TableName, TTableDocMap>
-	): Promise<{ count: number }>;
-	delete<TSelect = AppflareSelect<TTableDocMap[TableName]>, TInclude = never>(
-		args: AppflareDeleteArgs<TableName, TTableDocMap> & {
-			select?: TSelect;
-			include?: TInclude;
-		}
-	): Promise<AppflareResultDoc<
-		TTableDocMap[TableName],
-		TSelect,
-		TInclude,
-		TTableDocMap
-	> | null>;
-	deleteMany(
-		args?: AppflareDeleteManyArgs<TableName, TTableDocMap>
-	): Promise<{ count: number }>;
-	count(args?: AppflareCountArgs<TableName, TTableDocMap>): Promise<number>;
-	aggregate<
-		TGroup = AggregateGroupInput<TTableDocMap[TableName]>,
-		TSum extends ReadonlyArray<NumericKeys<TTableDocMap[TableName]>> =
-			ReadonlyArray<NumericKeys<TTableDocMap[TableName]>>,
-		TAvg extends ReadonlyArray<NumericKeys<TTableDocMap[TableName]>> =
-			ReadonlyArray<NumericKeys<TTableDocMap[TableName]>>,
-	>(
-		args: AppflareAggregateArgs<TableName, TTableDocMap, TGroup, TSum, TAvg>
-	): Promise<
-		Array<
-			AggregateResult<
-				TTableDocMap[TableName],
-				NormalizeGroupInput<TTableDocMap[TableName], TGroup>,
-				TSum,
-				TAvg
-			>
-		>
-	>;
-};
-
-export type AppflareModelMap<
-	TTableNames extends string,
-	TTableDocMap extends Record<TTableNames, TableDocBase>,
-> = {
-	[K in TTableNames]: AppflareTableClient<K, TTableDocMap>;
-};
-
-export type MongoDbContext<
-	TTableNames extends string,
-	TTableDocMap extends Record<TTableNames, TableDocBase>,
-> = AppflareModelMap<TTableNames, TTableDocMap>;
-
-export type CreateMongoDbContextOptions<TTableNames extends string> = {
-	db: Db;
-	/** The same schema object you pass to defineSchema(...) */
-	schema: Record<TTableNames, AnyZod>;
-	/** Override collection naming if desired. Default is the table name. */
-	collectionName?: (table: TTableNames) => string;
 };
 
 export type SchemaRefMap = Map<string, Map<string, string>>;
